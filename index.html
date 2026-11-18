@@ -38,7 +38,7 @@ nav{display:flex;gap:4px;flex:1}
 nav button{background:transparent;border:0;color:#c9d3e6;padding:8px 12px;border-radius:6px;font-weight:600;font-size:13px}
 nav button.on{background:rgba(255,255,255,.12);color:#fff}
 header .u{font-size:12px;color:#c9d3e6;display:flex;gap:10px;align-items:center}
-main{padding:20px;max-width:1200px;margin:0 auto}
+main{padding:20px 28px;max-width:1680px;margin:0 auto}
 .banner{background:#fff4ec;border:1px solid #f6c9ad;color:#8a4a22;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
 .card h2{margin:0 0 14px;font-size:15px;color:var(--navy)}
@@ -54,6 +54,14 @@ td{border-bottom:1px solid var(--line);padding:8px;font-size:13px;vertical-align
 td.n,th.n{text-align:right;white-space:nowrap}
 tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
 .tw{overflow-x:auto}
+.tn th{white-space:nowrap;padding:9px 7px}.tn td{padding:10px 7px}
+.tn .pill{display:table;margin:2px 0;white-space:nowrap;padding:2px 8px}
+.tn small.dol{display:block;color:var(--mut);font-size:11px}
+.tn tbody tr:hover td{background:#fafbfd}
+@media (max-width:1100px){main{padding:16px 12px}.card{padding:14px 12px}.tn th:first-child,.tn td:first-child{padding-left:2px}}
+@media (max-width:1280px){.tn th{white-space:normal;font-size:11px;padding:8px 5px;vertical-align:bottom}.tn td{font-size:12px;padding:9px 5px}.tn .btn.sm{padding:6px 9px}}
+.tn .fh{white-space:nowrap}.tn .fh small{display:block;color:var(--mut);font-size:11px}
+.tn td.n{font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
 .p-op{background:#e8f0ff;color:var(--navy)}.p-fin{background:#e6f6ec;color:var(--ok)}.p-fac{background:#fff1e8;color:#b0571f}
 .svc td input[type=number]{width:110px;padding:6px 8px;text-align:right}
@@ -69,6 +77,34 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
 .drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--mut)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:50;opacity:0;transition:.3s;pointer-events:none}
 .toast.show{opacity:1}
+/* Resumen ejecutivo (vista Naves) */
+.exec{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 2px rgba(22,43,82,.04)}
+.exec-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;padding:16px 22px 0}
+.exec-h h2{margin:0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--navy)}
+.exec-h span{font-size:12px;color:var(--mut)}
+.fin{display:grid;grid-template-columns:1.25fr 1fr 1fr;padding:6px 0 0}
+.fin>div{padding:14px 22px 18px;border-right:1px solid var(--line);min-width:0}
+.fin>div:last-child{border-right:0}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
+.val{font-size:30px;font-weight:700;color:var(--navy);line-height:1.15;margin-top:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.val .u{font-size:14px;font-weight:600;color:var(--mut);margin-right:5px;letter-spacing:.02em}
+.fin .main .val{font-size:34px}
+.sub2{font-size:12.5px;color:var(--mut);margin-top:6px;font-variant-numeric:tabular-nums}
+.sub2 b{color:var(--txt);font-weight:600}
+.chip{display:inline-block;font-size:12px;font-weight:700;border-radius:20px;padding:2px 9px;margin-left:6px;vertical-align:middle}
+.chip.ok{background:#e6f4ec;color:var(--ok)}.chip.bad{background:#fbe9e7;color:var(--bad)}
+.mix{padding:0 22px 18px}
+.mix-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#eef2f8}
+.mix-bar i{display:block;height:100%}
+.mix-leg{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--mut)}
+.mix-leg span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:var(--c);vertical-align:-1px}
+.ops{display:grid;grid-template-columns:repeat(4,1fr);background:#f7f9fc;border-top:1px solid var(--line)}
+.ops>div{padding:12px 22px;border-right:1px solid var(--line);min-width:0}
+.ops>div:last-child{border-right:0}
+.ops .val{font-size:20px;margin-top:3px}
+.ops .val .u{font-size:12px}
+@media (max-width:900px){.fin{grid-template-columns:1fr}.fin>div{border-right:0;border-bottom:1px solid var(--line)}.ops{grid-template-columns:1fr 1fr}.ops>div:nth-child(2){border-right:0}.ops>div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+@media print{.exec{box-shadow:none;break-inside:avoid}}
 @media print{header,nav,.noprint,.banner{display:none!important}main{padding:0}.card{border:0}}
 </style>
 </head>
@@ -104,20 +140,20 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
 
   <!-- ===== LISTA NAVES ===== -->
   <div id="v-naves">
-    <div class="kpis" id="kpis"></div>
+    <section class="exec" id="kpis" aria-label="Resumen financiero"></section>
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:12px">
         <h2 style="margin:0">Naves registradas</h2>
         <div class="row">
           <input id="fBus" placeholder="Buscar nave…" style="width:180px" oninput="renderNaves()">
           <select id="fCli" style="width:170px" onchange="renderNaves()"><option value="">Todos los clientes</option></select>
-          <select id="fEst" style="width:150px" onchange="renderNaves()"><option value="">Todos los estados</option><option>En operación</option><option>Finalizada</option><option>Facturada</option></select>
+          <select id="fEst" style="width:175px" onchange="renderNaves()"><option value="">Todos los estados</option><option>En operación</option><option>Finalizada</option><option>Facturada</option></select>
           <button class="btn g" onclick="exportNaves()">Exportar Excel</button>
           <button class="btn o" onclick="nuevaNave()">+ Nueva nave</button>
         </div>
       </div>
-      <div class="tw"><table>
-        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th class="n">Dólar obs.</th><th class="n">Total CLP</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th></th></tr></thead>
+      <div class="tw"><table class="tn">
+        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th class="n">Total CLP</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th></th></tr></thead>
         <tbody id="tNaves"></tbody>
       </table></div>
     </div>
@@ -401,6 +437,7 @@ async function onUser(u){
 let TAR=null, NAVES=[], EDIT=null, PREV=null;
 const fmt=v=>(v==null||isNaN(v))?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt0=v=>(v||0).toLocaleString("es-CL",{maximumFractionDigits:0});
+const fAtr=s=>{if(!s)return "—";const d=new Date(s);if(isNaN(d))return esc(s);return d.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})+`<small>${d.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit",hour12:false})} h</small>`;};
 const fDate=s=>s?new Date(s).toLocaleString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
 const fDay=s=>s?s.split("-").reverse().join("-"):"—";
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2400);}
@@ -440,27 +477,39 @@ function renderNaves(){
                .sort((a,b)=>(b.atraque||"").localeCompare(a.atraque||""));
   const pc={"En operación":"p-op","Finalizada":"p-fin","Facturada":"p-fac"};
   $("tNaves").innerHTML=L.length?L.map(n=>`<tr>
-    <td><b>${esc(n.nombre)}</b></td><td>${esc(n.cliente)}</td><td>${esc(n.viaje)}</td><td>${esc(n.carga)}</td><td>${fDate(n.atraque)}</td>
+    <td><b>${esc(n.nombre)}</b></td><td>${esc(n.cliente)}</td><td>${esc(n.viaje)}</td><td>${esc(n.carga)}</td><td class="fh">${fAtr(n.atraque)}</td>
     <td class="n">${fmt(n.eslora)}</td><td class="n">${fmt(n.horas)}</td><td class="n">${fmt0(n.toneladas)}</td>
     <td><span class="pill ${pc[n.estado]||""}">${esc(n.estado)}</span>${tieneEsp(n)?' <span class="pill p-esp" title="Tiene tarifas distintas a la pública">Tarifa especial</span>':""}</td>
     <td class="n"><b>${fmt(n.total)}</b></td>
-    <td class="n">${n.dolar?fmt(n.dolar):'<span class="muted">—</span>'}</td>
-    <td class="n">${n.dolar?"$ "+fmt0(n.total*n.dolar):'<span class="muted">—</span>'}</td>
+    <td class="n">${n.dolar?`$ ${fmt0(n.total*n.dolar)}<small class="dol">dólar ${fmt(n.dolar)}</small>`:'<span class="muted">Sin dólar</span>'}</td>
     <td class="n">${fmt(n.totalEgresos||0)}</td>
     <td class="n" style="color:${(n.total||0)-(n.totalEgresos||0)>=0?"var(--ok)":"var(--bad)"}"><b>${fmt((n.total||0)-(n.totalEgresos||0))}</b></td>
     <td><button class="btn sm g" onclick="abrirNave('${n.id}')">Abrir</button></td></tr>`).join("")
-    :`<tr><td colspan="15" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
+    :`<tr><td colspan="14" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
   const tot=L.reduce((s,n)=>s+(n.total||0),0), ton=L.reduce((s,n)=>s+(+n.toneladas||0),0);
   const clp=L.reduce((s,n)=>s+(n.dolar?(n.total||0)*n.dolar:0),0), sinD=L.filter(n=>!n.dolar).length;
   const egr=L.reduce((s,n)=>s+(n.totalEgresos||0),0);
+  const mg=tot-egr, mgP=tot?mg/tot*100:0, egP=tot?Math.min(egr/tot*100,100):0;
+  const filtro=[cli,est,q?`“${q}”`:""].filter(Boolean).join(" · ")||"Todas las naves";
+  const U=u=>`<span class="u">${u}</span>`, S=u=>`<span class="u" style="margin:0 0 0 4px">${u}</span>`;
   $("kpis").innerHTML=`
-    <div class="kpi"><small>Naves (filtro)</small><b>${L.length}</b></div>
-    <div class="kpi"><small>Ingresos totales</small><b>US$ ${fmt(tot)}</b></div>
-    <div class="kpi"><small>Ingresos en pesos${sinD?` (${sinD} sin dólar)`:""}</small><b>$ ${fmt0(clp)}</b></div>
-    <div class="kpi" style="border-left-color:var(--bad)"><small>Egresos totales</small><b>US$ ${fmt(egr)}</b></div>
-    <div class="kpi" style="border-left-color:var(--ok)"><small>Margen</small><b>US$ ${fmt(tot-egr)}</b><small>${tot?fmt((tot-egr)/tot*100)+"%":""}</small></div>
-    <div class="kpi"><small>Toneladas</small><b>${fmt0(ton)}</b></div>
-    <div class="kpi"><small>Promedio por nave</small><b>US$ ${fmt(L.length?tot/L.length:0)}</b></div>`;
+    <div class="exec-h"><h2>Resumen financiero</h2><span>${esc(filtro)} · ${L.length} nave${L.length===1?"":"s"}</span></div>
+    <div class="fin">
+      <div class="main"><div class="lbl">Ingresos</div><div class="val">${U("US$")}${fmt(tot)}</div>
+        <div class="sub2"><b>$ ${fmt0(clp)}</b> CLP${sinD?` · ${sinD} nave${sinD===1?"":"s"} sin dólar observado`:" al dólar observado"}</div></div>
+      <div><div class="lbl">Egresos</div><div class="val">${U("US$")}${fmt(egr)}</div>
+        <div class="sub2">${tot?`<b>${fmt(egP)}%</b> de los ingresos`:"—"}</div></div>
+      <div><div class="lbl">Margen</div><div class="val" style="color:${mg>=0?"var(--ok)":"var(--bad)"}">${U("US$")}${fmt(mg)}</div>
+        <div class="sub2">Sobre ingresos${tot?`<span class="chip ${mg>=0?"ok":"bad"}">${fmt(mgP)}%</span>`:""}</div></div>
+    </div>
+    ${tot?`<div class="mix"><div class="mix-bar" role="img" aria-label="Egresos ${fmt(egP)}% y margen ${fmt(Math.max(mgP,0))}% de los ingresos"><i style="width:${egP}%;background:#c9d3e3"></i><i style="width:${Math.max(100-egP,0)}%;background:var(--ok)"></i></div>
+      <div class="mix-leg"><span style="--c:#c9d3e3">Egresos ${fmt(egP)}%</span><span style="--c:var(--ok)">Margen ${fmt(Math.max(mgP,0))}%</span></div></div>`:""}
+    <div class="ops">
+      <div><div class="lbl">Naves</div><div class="val">${L.length}</div></div>
+      <div><div class="lbl">Toneladas</div><div class="val">${fmt0(ton)}${S("t")}</div></div>
+      <div><div class="lbl">Ingreso promedio por nave</div><div class="val">${U("US$")}${fmt(L.length?tot/L.length:0)}</div></div>
+      <div><div class="lbl">Ingreso por tonelada</div><div class="val">${U("US$")}${ton?fmt(tot/ton):"—"}${ton?S("/t"):""}</div></div>
+    </div>`;
 }
 
 /* ---------- Editor nave ---------- */

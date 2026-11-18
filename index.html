@@ -110,13 +110,14 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         <h2 style="margin:0">Naves registradas</h2>
         <div class="row">
           <input id="fBus" placeholder="Buscar nave…" style="width:180px" oninput="renderNaves()">
+          <select id="fCli" style="width:170px" onchange="renderNaves()"><option value="">Todos los clientes</option></select>
           <select id="fEst" style="width:150px" onchange="renderNaves()"><option value="">Todos los estados</option><option>En operación</option><option>Finalizada</option><option>Facturada</option></select>
           <button class="btn g" onclick="exportNaves()">Exportar Excel</button>
           <button class="btn o" onclick="nuevaNave()">+ Nueva nave</button>
         </div>
       </div>
       <div class="tw"><table>
-        <thead><tr><th>Nave</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th></th></tr></thead>
+        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th></th></tr></thead>
         <tbody id="tNaves"></tbody>
       </table></div>
     </div>
@@ -128,6 +129,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
       <h2 id="edTit">Nueva nave</h2>
       <div class="grid">
         <div><label>Nombre nave</label><input id="nNombre" placeholder="MN …"></div>
+        <div><label>Cliente</label><input id="nCliente" list="dlClientes" placeholder="Escriba o elija" onchange="sugerirTarCliente()"><datalist id="dlClientes"></datalist></div>
         <div><label>N° viaje / recalada</label><input id="nViaje"></div>
         <div><label>Agencia</label><input id="nAgencia"></div>
         <div><label>Tipo de carga</label><input id="nCarga" placeholder="Clinker, carbón, bobinas…"></div>
@@ -153,6 +155,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         <button class="btn sm g" onclick="document.getElementById('fTarNave').click()">Cargar tarifas de esta nave (Excel)</button>
         <button class="btn sm g" onclick="descargarTarNave()">Descargar tarifas de esta nave</button>
         <button class="btn sm g" onclick="restablecerPub()">Restablecer tarifas públicas</button>
+        <button class="btn sm g hidden" id="btnTarCli" onclick="copiarTarCliente()"></button>
         <span class="muted" id="edEsp"></span>
       </div>
       <div class="tw"><table class="svc">
@@ -381,17 +384,20 @@ function go(v){
 
 /* ---------- Lista naves ---------- */
 function renderNaves(){
-  const q=$("fBus").value.toLowerCase(), est=$("fEst").value;
-  const L=NAVES.filter(n=>(!q||(n.nombre+" "+n.viaje+" "+n.carga).toLowerCase().includes(q))&&(!est||n.estado===est))
+  const q=$("fBus").value.toLowerCase(), est=$("fEst").value, cli=$("fCli").value;
+  const cls=clientes(), fc=$("fCli");
+  fc.innerHTML='<option value="">Todos los clientes</option>'+cls.map(c=>`<option ${c===cli?"selected":""}>${esc(c)}</option>`).join("");
+  $("dlClientes").innerHTML=cls.map(c=>`<option value="${esc(c)}">`).join("");
+  const L=NAVES.filter(n=>(!q||(n.nombre+" "+(n.cliente||"")+" "+n.viaje+" "+n.carga).toLowerCase().includes(q))&&(!est||n.estado===est)&&(!cli||n.cliente===cli))
                .sort((a,b)=>(b.atraque||"").localeCompare(a.atraque||""));
   const pc={"En operación":"p-op","Finalizada":"p-fin","Facturada":"p-fac"};
   $("tNaves").innerHTML=L.length?L.map(n=>`<tr>
-    <td><b>${esc(n.nombre)}</b></td><td>${esc(n.viaje)}</td><td>${esc(n.carga)}</td><td>${fDate(n.atraque)}</td>
+    <td><b>${esc(n.nombre)}</b></td><td>${esc(n.cliente)}</td><td>${esc(n.viaje)}</td><td>${esc(n.carga)}</td><td>${fDate(n.atraque)}</td>
     <td class="n">${fmt(n.eslora)}</td><td class="n">${fmt(n.horas)}</td><td class="n">${fmt0(n.toneladas)}</td>
     <td><span class="pill ${pc[n.estado]||""}">${esc(n.estado)}</span>${tieneEsp(n)?' <span class="pill p-esp" title="Tiene tarifas distintas a la pública">Tarifa especial</span>':""}</td>
     <td class="n"><b>${fmt(n.total)}</b></td>
     <td><button class="btn sm g" onclick="abrirNave('${n.id}')">Abrir</button></td></tr>`).join("")
-    :`<tr><td colspan="10" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
+    :`<tr><td colspan="11"class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
   const tot=L.reduce((s,n)=>s+(n.total||0),0), ton=L.reduce((s,n)=>s+(+n.toneladas||0),0);
   $("kpis").innerHTML=`
     <div class="kpi"><small>Naves (filtro)</small><b>${L.length}</b></div>
@@ -401,7 +407,22 @@ function renderNaves(){
 }
 
 /* ---------- Editor nave ---------- */
-const CAMPOS={nNombre:"nombre",nViaje:"viaje",nAgencia:"agencia",nCarga:"carga",nOper:"operacion",nSitio:"sitio",nEslora:"eslora",nTon:"toneladas",nAtr:"atraque",nDes:"desatraque",nHoras:"horas",nEstado:"estado",nObs:"obs"};
+const clientes=()=>[...new Set(NAVES.map(n=>(n.cliente||"").trim()).filter(Boolean))].sort();
+function ultimaNaveCliente(c){
+  return NAVES.filter(n=>n.cliente===c&&n.id!==EDIT?.id).sort((a,b)=>(b.atraque||b.actualizado||"").localeCompare(a.atraque||a.actualizado||""))[0];
+}
+function sugerirTarCliente(){
+  const c=$("nCliente").value.trim(), b=$("btnTarCli"), u=c&&ultimaNaveCliente(c);
+  if(u){b.textContent=`Usar tarifas de ${c} (última: ${u.nombre})`;b.classList.remove("hidden");}
+  else b.classList.add("hidden");
+}
+function copiarTarCliente(){
+  const c=$("nCliente").value.trim(), u=ultimaNaveCliente(c); if(!u) return;
+  let k=0;
+  EDIT.servicios.forEach(s=>{const o=u.servicios.find(x=>x.n===s.n); if(o&&o.tarifa!==s.tarifa){s.tarifa=o.tarifa;k++;}});
+  renderSvc(); toast(k?`${k} tarifa(s) copiadas de ${u.nombre}`:"Las tarifas ya coinciden");
+}
+const CAMPOS={nNombre:"nombre",nCliente:"cliente",nViaje:"viaje",nAgencia:"agencia",nCarga:"carga",nOper:"operacion",nSitio:"sitio",nEslora:"eslora",nTon:"toneladas",nAtr:"atraque",nDes:"desatraque",nHoras:"horas",nEstado:"estado",nObs:"obs"};
 function nuevaNave(){
   EDIT={nombre:"",estado:"En operación",operacion:"Descarga",
         tarifaVig:{desde:TAR.desde,hasta:TAR.hasta},
@@ -426,7 +447,7 @@ function pintarEditor(tit){
   $("edVig").textContent="Tarifas vigencia "+fDay(EDIT.tarifaVig?.desde)+" al "+fDay(EDIT.tarifaVig?.hasta);
   ["naves","editor","tarifas"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!=="editor"));
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v==="editor"));
-  renderSvc(); window.scrollTo(0,0);
+  renderSvc(); sugerirTarCliente(); window.scrollTo(0,0);
 }
 function calcHoras(){
   const a=$("nAtr").value,d=$("nDes").value;
@@ -508,10 +529,10 @@ async function borrarNave(){
 
 /* ---------- Exportar naves ---------- */
 function exportNaves(){
-  const res=NAVES.map(n=>({Nave:n.nombre,Viaje:n.viaje,Agencia:n.agencia,Carga:n.carga,Operación:n.operacion,Sitio:n.sitio,
+  const res=NAVES.map(n=>({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,Agencia:n.agencia,Carga:n.carga,Operación:n.operacion,Sitio:n.sitio,
     Atraque:fDate(n.atraque),Desatraque:fDate(n.desatraque),"Eslora (m)":n.eslora,Horas:n.horas,Toneladas:n.toneladas,Estado:n.estado,"Total US$":+(n.total||0).toFixed(2)}));
   const det=[];
-  NAVES.forEach(n=>n.servicios.filter(s=>s.sel).forEach(s=>det.push({Nave:n.nombre,Viaje:n.viaje,"N°":s.n,Ítem:s.desc,Unidad:s.unidad,"Tarifa pública US$":s.tarifaPub??s.tarifa,"Tarifa aplicada US$":s.tarifa,"Especial":esEsp(s)?"Sí":"",Cantidad:s.cant,"Subtotal US$":+((+s.cant||0)*(s.tarifa||0)).toFixed(2)})));
+  NAVES.forEach(n=>n.servicios.filter(s=>s.sel).forEach(s=>det.push({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,"N°":s.n,Ítem:s.desc,Unidad:s.unidad,"Tarifa pública US$":s.tarifaPub??s.tarifa,"Tarifa aplicada US$":s.tarifa,"Especial":esEsp(s)?"Sí":"",Cantidad:s.cant,"Subtotal US$":+((+s.cant||0)*(s.tarifa||0)).toFixed(2)})));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),"Resumen naves");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(det),"Detalle servicios");

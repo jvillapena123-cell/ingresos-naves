@@ -295,6 +295,29 @@ function inferBase(u){
 }
 const BASE_TXT={ESLORA_HORA:"eslora×h",HORA_NAVE:"horas",TONELADA:"ton",MANUAL:""};
 
+/* Ingreso por transferencia (US$/t × toneladas de la nave). Se agrega al final de la
+   sección II del tarifado vigente si aún no está; los ítems siguientes corren su N° en 1. */
+const normD=s=>String(s??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+const TRANSF={desc:"Transferencia de Carga",unidad:"US$/Tonelada",tarifa:5.50,base:"TONELADA"};
+function asegurarTransferencia(T){
+  if(!T||!Array.isArray(T.items)||T.items.some(i=>/transferencia/.test(normD(i.desc))))return T;
+  const s2=T.items.filter(i=>/^ii[.\s)-]/.test(normD(i.sec))||/embarque/.test(normD(i.sec)));
+  const sec=s2.length?s2[0].sec:"II. Servicios de Embarque/Descarga";
+  const n=s2.length?Math.max(...s2.map(i=>+i.n||0))+1:9;
+  T.items.forEach(i=>{if(i.n>=n)i.n++;});
+  T.items.push({n,sec,...TRANSF});
+  T.items.sort((a,b)=>a.n-b.n);
+  return T;
+}
+/* Ajusta los N° de los servicios de una nave guardada al tarifado vigente (por nombre del ítem) */
+function sincronizarN(nave){
+  if(!TAR||!nave||!Array.isArray(nave.servicios))return nave;
+  const m=new Map(TAR.items.map(i=>[normD(i.desc),i.n]));
+  nave.servicios.forEach(s=>{const k=m.get(normD(s.desc));if(k!=null)s.n=k;});
+  nave.servicios.sort((a,b)=>a.n-b.n);
+  return nave;
+}
+
 /* =========================================================
    3) CAPA DE DATOS (Firebase o localStorage en demo)
    ========================================================= */
@@ -326,9 +349,9 @@ const Data={
     return s.docs.map(d=>d.data());
   },
   async listNaves(){
-    if(DEMO) return LS.get("naves")||[];
+    if(DEMO) return (LS.get("naves")||[]).map(sincronizarN);
     const s=await db.collection("naves").orderBy("atraque","desc").get();
-    return s.docs.map(d=>({id:d.id,...d.data()}));
+    return s.docs.map(d=>sincronizarN({id:d.id,...d.data()}));
   },
   async saveNave(n){
     n.actualizado=new Date().toISOString(); n.por=user?.email||"demo";
@@ -387,6 +410,7 @@ async function cargarTodo(){
   try{
     TAR=await Data.getTarifas();
     if(!TAR){ TAR=JSON.parse(JSON.stringify(TARIFA_INICIAL)); TAR.items.forEach(i=>i.base=inferBase(i.unidad)); await Data.saveTarifas(TAR); }
+    asegurarTransferencia(TAR);
     NAVES=await Data.listNaves();
   }catch(e){console.error(e);toast("Error al leer datos: "+e.message);}
   vigBanner(); renderNaves(); renderTarifas();
@@ -468,7 +492,8 @@ function abrirNave(id){
   const n=NAVES.find(x=>x.id===id); if(!n) return;
   EDIT=JSON.parse(JSON.stringify(n));
   // agrega ítems nuevos del tarifado que la nave no tenía (sin tocar los ya tarifados)
-  TAR.items.forEach(i=>{ if(!EDIT.servicios.some(s=>s.n===i.n)) EDIT.servicios.push({...i,tarifaPub:i.tarifa,sel:false,cant:null,auto:true}); });
+  const tDescs=new Set(TAR.items.map(i=>normD(i.desc)));
+  TAR.items.forEach(i=>{ if(!EDIT.servicios.some(s=>normD(s.desc)===normD(i.desc)||(s.n===i.n&&!tDescs.has(normD(s.desc))))) EDIT.servicios.push({...i,tarifaPub:i.tarifa,sel:false,cant:null,auto:true}); });
   EDIT.servicios.forEach(s=>{ if(s.tarifaPub===undefined) s.tarifaPub=s.tarifa; });
   EDIT.servicios.sort((a,b)=>a.n-b.n);
   pintarEditor(n.nombre||"Nave");
@@ -631,7 +656,7 @@ function cargarTarNave(f){
   leerTarifas(f,items=>{
     let c=0;
     items.forEach(it=>{
-      let s=EDIT.servicios.find(x=>x.n===it.n);
+      let s=EDIT.servicios.find(x=>normD(x.desc)===normD(it.desc))||EDIT.servicios.find(x=>x.n===it.n);
       if(s){ if(s.tarifa!==it.tarifa){s.tarifa=it.tarifa;c++;} }
       else { EDIT.servicios.push({...it,tarifaPub:null,sel:false,cant:null,auto:true}); c++; }
     });
@@ -750,7 +775,7 @@ async function confirmarTarifas(){
   const d=$("tDesde").value,h=$("tHasta").value;
   if(!d||!h){toast("Indique la vigencia desde / hasta");return;}
   const nuevo={desde:d,hasta:h,items:PREV};
-  try{await Data.saveTarifas(nuevo); TAR=await Data.getTarifas(); cancelPrev(); vigBanner(); renderTarifas(); toast("Tarifado publicado");}
+  try{await Data.saveTarifas(nuevo); TAR=asegurarTransferencia(await Data.getTarifas()); NAVES=NAVES.map(sincronizarN); cancelPrev(); vigBanner(); renderTarifas(); toast("Tarifado publicado");}
   catch(e){toast("Error: "+e.message);}
 }
 </script>

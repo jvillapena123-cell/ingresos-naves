@@ -117,7 +117,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         </div>
       </div>
       <div class="tw"><table>
-        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th class="n">Dólar obs.</th><th class="n">Total CLP</th><th></th></tr></thead>
+        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th class="n">Dólar obs.</th><th class="n">Total CLP</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th></th></tr></thead>
         <tbody id="tNaves"></tbody>
       </table></div>
     </div>
@@ -165,6 +165,28 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
       </table></div>
       <div class="tot">Total nave: <span id="edTot">US$ 0,00</span></div>
       <div class="tot" style="font-size:15px;margin-top:4px">Total en pesos: <span id="edTotClp">—</span></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">Egresos de la nave</h2>
+        <div class="row noprint" style="gap:6px">
+          <button class="btn sm g" onclick="addEgr('Costo transferencia')">+ Costo transferencia</button>
+          <button class="btn sm g" onclick="addEgr('Costo de porteo')">+ Costo de porteo</button>
+          <button class="btn sm o" onclick="addEgr('')">+ Otro egreso</button>
+        </div>
+      </div>
+      <p class="muted" style="margin:0 0 10px">Los montos en pesos se convierten a US$ con el dólar observado del desatraque. “Por tonelada” y “Por hora” toman la cantidad de la nave (puede cambiarla).</p>
+      <div class="tw"><table class="svc">
+        <thead><tr><th>Concepto</th><th>Proveedor</th><th>Moneda</th><th>Modo</th><th class="n">Valor</th><th class="n">Cantidad</th><th class="n">Subtotal</th><th class="n">Subtotal US$</th><th></th></tr></thead>
+        <tbody id="tEgr"></tbody>
+      </table></div>
+      <div class="tot" style="font-size:15px">Total egresos: <span id="edEgr">US$ 0,00</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Resultado de la nave</h2>
+      <div class="kpis" id="edRes" style="margin-bottom:0"></div>
       <div style="margin-top:12px"><label>Observaciones</label><input id="nObs"></div>
       <div class="row noprint" style="margin-top:16px;justify-content:flex-end">
         <button class="btn r hidden" id="btnDel" onclick="borrarNave()">Eliminar</button>
@@ -400,14 +422,19 @@ function renderNaves(){
     <td class="n"><b>${fmt(n.total)}</b></td>
     <td class="n">${n.dolar?fmt(n.dolar):'<span class="muted">—</span>'}</td>
     <td class="n">${n.dolar?"$ "+fmt0(n.total*n.dolar):'<span class="muted">—</span>'}</td>
+    <td class="n">${fmt(n.totalEgresos||0)}</td>
+    <td class="n" style="color:${(n.total||0)-(n.totalEgresos||0)>=0?"var(--ok)":"var(--bad)"}"><b>${fmt((n.total||0)-(n.totalEgresos||0))}</b></td>
     <td><button class="btn sm g" onclick="abrirNave('${n.id}')">Abrir</button></td></tr>`).join("")
-    :`<tr><td colspan="13" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
+    :`<tr><td colspan="15" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
   const tot=L.reduce((s,n)=>s+(n.total||0),0), ton=L.reduce((s,n)=>s+(+n.toneladas||0),0);
   const clp=L.reduce((s,n)=>s+(n.dolar?(n.total||0)*n.dolar:0),0), sinD=L.filter(n=>!n.dolar).length;
+  const egr=L.reduce((s,n)=>s+(n.totalEgresos||0),0);
   $("kpis").innerHTML=`
     <div class="kpi"><small>Naves (filtro)</small><b>${L.length}</b></div>
     <div class="kpi"><small>Ingresos totales</small><b>US$ ${fmt(tot)}</b></div>
     <div class="kpi"><small>Ingresos en pesos${sinD?` (${sinD} sin dólar)`:""}</small><b>$ ${fmt0(clp)}</b></div>
+    <div class="kpi" style="border-left-color:var(--bad)"><small>Egresos totales</small><b>US$ ${fmt(egr)}</b></div>
+    <div class="kpi" style="border-left-color:var(--ok)"><small>Margen</small><b>US$ ${fmt(tot-egr)}</b><small>${tot?fmt((tot-egr)/tot*100)+"%":""}</small></div>
     <div class="kpi"><small>Toneladas</small><b>${fmt0(ton)}</b></div>
     <div class="kpi"><small>Promedio por nave</small><b>US$ ${fmt(L.length?tot/L.length:0)}</b></div>`;
 }
@@ -529,6 +556,64 @@ function renderSvc(){
   $("edTot").textContent="US$ "+fmt(EDIT.total);
   const dol=+$("nDolar").value||EDIT.dolar;
   $("edTotClp").textContent=dol?`$ ${fmt0(EDIT.total*dol)}  (US$ ${fmt(EDIT.total)} × $ ${fmt(dol)})`:"Falta dólar observado (ingrese fecha de desatraque)";
+  renderEgr();
+}
+
+/* ---------- Egresos ---------- */
+const MODO_TXT={GLOBAL:"Monto global",TON:"Por tonelada",HORA:"Por hora"};
+function egrCant(e){
+  if(e.modo==="TON") return +$("nTon").value||0;
+  if(e.modo==="HORA") return +$("nHoras").value||0;
+  return 1;
+}
+function egrUSD(e,dol){
+  const sub=(+e.valor||0)*(+e.cant||0);
+  if(e.moneda==="USD") return sub;
+  return dol?sub/dol:null;
+}
+function addEgr(c){
+  EDIT.egresos=EDIT.egresos||[];
+  EDIT.egresos.push({concepto:c,proveedor:"",moneda:"CLP",modo:c?"TON":"GLOBAL",valor:null,cant:null,auto:true});
+  renderEgr();
+  const ins=$("tEgr").querySelectorAll("tr:last-child input"); if(ins[c?2:0]) ins[c?2:0].focus();
+}
+function setEgr(i,k,v){
+  const e=EDIT.egresos[i];
+  if(k==="valor") e.valor=v===""?null:+v;
+  else if(k==="cant"){e.cant=+v;e.auto=false;}
+  else {e[k]=v; if(k==="modo") e.auto=true;}
+  renderEgr();
+}
+function delEgr(i){EDIT.egresos.splice(i,1);renderEgr();}
+function renderEgr(){
+  const L=EDIT.egresos=EDIT.egresos||[];
+  const dol=+$("nDolar").value||EDIT.dolar||0;
+  let tot=0,falta=false;
+  $("tEgr").innerHTML=L.length?L.map((e,i)=>{
+    if(e.auto) e.cant=egrCant(e);
+    const sub=(+e.valor||0)*(+e.cant||0), usd=egrUSD(e,dol);
+    if(usd==null) falta=true; else tot+=usd;
+    const opt=(o,v)=>Object.entries(o).map(([k,t])=>`<option value="${k}" ${k===v?"selected":""}>${t}</option>`).join("");
+    return `<tr>
+      <td><input value="${esc(e.concepto)}" placeholder="Concepto" onchange="setEgr(${i},'concepto',this.value)" style="min-width:150px"></td>
+      <td><input value="${esc(e.proveedor)}" placeholder="Proveedor" onchange="setEgr(${i},'proveedor',this.value)" style="min-width:120px"></td>
+      <td><select onchange="setEgr(${i},'moneda',this.value)" style="width:80px">${opt({CLP:"$",USD:"US$"},e.moneda)}</select></td>
+      <td><select onchange="setEgr(${i},'modo',this.value)" style="width:130px">${opt(MODO_TXT,e.modo)}</select></td>
+      <td class="n"><input type="number" step="0.01" value="${e.valor??""}" onchange="setEgr(${i},'valor',this.value)" style="width:110px;text-align:right"></td>
+      <td class="n">${e.modo==="GLOBAL"?"1":`<input type="number" step="0.01" value="${e.cant??""}" onchange="setEgr(${i},'cant',this.value)" style="width:100px;text-align:right">`}</td>
+      <td class="n">${e.moneda==="USD"?"US$ "+fmt(sub):"$ "+fmt0(sub)}</td>
+      <td class="n"><b>${usd==null?'<span class="muted">falta dólar</span>':fmt(usd)}</b></td>
+      <td><button class="btn sm r" onclick="delEgr(${i})" title="Quitar">✕</button></td></tr>`;
+  }).join(""):`<tr><td colspan="9" class="muted" style="text-align:center;padding:16px">Sin egresos. Agregue costo de transferencia, porteo u otro.</td></tr>`;
+  EDIT.totalEgresos=tot;
+  $("edEgr").textContent="US$ "+fmt(tot)+(falta?" (+ montos en $ sin dólar)":"")+(dol?`  ·  $ ${fmt0(tot*dol)}`:"");
+  const ing=EDIT.total||0, mg=ing-tot, pct=ing?mg/ing*100:0;
+  EDIT.margen=mg;
+  $("edRes").innerHTML=`
+    <div class="kpi"><small>Ingresos</small><b>US$ ${fmt(ing)}</b>${dol?`<small>$ ${fmt0(ing*dol)}</small>`:""}</div>
+    <div class="kpi" style="border-left-color:var(--bad)"><small>Egresos</small><b>US$ ${fmt(tot)}</b>${dol?`<small>$ ${fmt0(tot*dol)}</small>`:""}</div>
+    <div class="kpi" style="border-left-color:${mg>=0?"var(--ok)":"var(--bad)"}"><small>Margen</small><b style="color:${mg>=0?"var(--ok)":"var(--bad)"}">US$ ${fmt(mg)}</b>${dol?`<small>$ ${fmt0(mg*dol)}</small>`:""}</div>
+    <div class="kpi"><small>Margen %</small><b>${fmt(pct)}%</b></div>`;
   const nEsp=EDIT.servicios.filter(esEsp).length;
   $("edEsp").textContent=nEsp?`${nEsp} ítem(s) con tarifa especial`:"Usando tarifa pública";
 }
@@ -580,12 +665,19 @@ function exportNaves(){
   const res=NAVES.map(n=>({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,Agencia:n.agencia,Carga:n.carga,Operación:n.operacion,Sitio:n.sitio,
     Atraque:fDate(n.atraque),Desatraque:fDate(n.desatraque),"Eslora (m)":n.eslora,Horas:n.horas,Toneladas:n.toneladas,Estado:n.estado,"Total US$":+(n.total||0).toFixed(2),
     "Dólar observado":n.dolar||"","Fecha dólar":n.dolarFecha?fDay(n.dolarFecha):"","Fuente dólar":n.dolarFuente||"",
-    "Total CLP":n.dolar?Math.round((n.total||0)*n.dolar):""}));
+    "Total CLP":n.dolar?Math.round((n.total||0)*n.dolar):"",
+    "Egresos US$":+(n.totalEgresos||0).toFixed(2),"Margen US$":+((n.total||0)-(n.totalEgresos||0)).toFixed(2),
+    "Margen %":n.total?+(((n.total-(n.totalEgresos||0))/n.total)*100).toFixed(1):""}));
+  const egrRows=[];
+  NAVES.forEach(n=>(n.egresos||[]).forEach(e=>{const sub=(+e.valor||0)*(+e.cant||0);egrRows.push({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,
+    Concepto:e.concepto,Proveedor:e.proveedor,Moneda:e.moneda==="USD"?"US$":"$",Modo:MODO_TXT[e.modo],Valor:e.valor,Cantidad:e.cant,
+    Subtotal:+sub.toFixed(2),"Subtotal US$":e.moneda==="USD"?+sub.toFixed(2):(n.dolar?+(sub/n.dolar).toFixed(2):"")});}));
   const det=[];
   NAVES.forEach(n=>n.servicios.filter(s=>s.sel).forEach(s=>det.push({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,"N°":s.n,Ítem:s.desc,Unidad:s.unidad,"Tarifa pública US$":s.tarifaPub??s.tarifa,"Tarifa aplicada US$":s.tarifa,"Especial":esEsp(s)?"Sí":"",Cantidad:s.cant,"Subtotal US$":+((+s.cant||0)*(s.tarifa||0)).toFixed(2)})));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),"Resumen naves");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(det),"Detalle servicios");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(egrRows),"Egresos");
   XLSX.writeFile(wb,"Ingresos_Naves_HTP.xlsx");
 }
 

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingresos por Nave · HTP</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{--navy:#1F3A6E;--navy2:#162b52;--orange:#E8804A;--bg:#f3f5f9;--line:#dde3ec;--txt:#1d2433;--mut:#6b7486;--ok:#1f8a4c;--bad:#c0392b}
+*{box-sizing:border-box}
+body{margin:0;font-family:Montserrat,system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%}
+input:focus,select:focus{outline:2px solid var(--orange);border-color:transparent}
+label{font-size:12px;font-weight:600;color:var(--mut);display:block;margin-bottom:4px}
+.btn{border:0;border-radius:8px;padding:9px 14px;font-weight:600;font-size:13px;background:var(--navy);color:#fff}
+.btn.o{background:var(--orange)}
+.btn.g{background:#fff;color:var(--navy);border:1px solid var(--line)}
+.btn.r{background:#fff;color:var(--bad);border:1px solid #f0c9c4}
+.btn.sm{padding:6px 10px;font-size:12px}
+.hidden{display:none!important}
+/* login */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy),var(--navy2))}
+.lbox{background:#fff;border-radius:14px;padding:32px;width:min(380px,92vw);box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.lbox h1{margin:0 0 4px;color:var(--navy);font-size:20px}
+.lbox p{margin:0 0 20px;color:var(--mut);font-size:13px}
+.lbox .f{margin-bottom:14px}
+.err{color:var(--bad);font-size:12px;min-height:16px;margin-top:8px}
+/* app */
+header{background:var(--navy);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+header .brand{font-weight:700;font-size:16px}
+header .brand span{color:var(--orange)}
+nav{display:flex;gap:4px;flex:1}
+nav button{background:transparent;border:0;color:#c9d3e6;padding:8px 12px;border-radius:6px;font-weight:600;font-size:13px}
+nav button.on{background:rgba(255,255,255,.12);color:#fff}
+header .u{font-size:12px;color:#c9d3e6;display:flex;gap:10px;align-items:center}
+main{padding:20px;max-width:1200px;margin:0 auto}
+.banner{background:#fff4ec;border:1px solid #f6c9ad;color:#8a4a22;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2{margin:0 0 14px;font-size:15px;color:var(--navy)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid var(--line);border-left:4px solid var(--orange);border-radius:10px;padding:14px}
+.kpi b{display:block;font-size:22px;color:var(--navy)}
+.kpi small{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse}
+th{background:#eef2f8;color:var(--navy);font-size:12px;text-align:left;padding:8px;font-weight:700}
+td{border-bottom:1px solid var(--line);padding:8px;font-size:13px;vertical-align:middle}
+td.n,th.n{text-align:right;white-space:nowrap}
+tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
+.tw{overflow-x:auto}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+.p-op{background:#e8f0ff;color:var(--navy)}.p-fin{background:#e6f6ec;color:var(--ok)}.p-fac{background:#fff1e8;color:#b0571f}
+.svc td input[type=number]{width:110px;padding:6px 8px;text-align:right}
+.svc tr.off{opacity:.45}
+.svc input.tar{width:100px;padding:6px 8px;text-align:right}
+.svc input.esp{border-color:var(--orange);background:#fff4ec;font-weight:700;color:#b0571f}
+.pub{display:block;font-size:10px;color:var(--mut)}
+.p-esp{background:#fff1e8;color:#b0571f}
+.tot{font-size:18px;font-weight:700;color:var(--navy);text-align:right;margin-top:12px}
+.tot span{color:var(--orange)}
+.muted{color:var(--mut);font-size:12px}
+.base{font-size:10px;font-weight:700;color:var(--mut);background:#eef2f8;border-radius:4px;padding:1px 5px;margin-left:4px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--mut)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:50;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+@media print{header,nav,.noprint,.banner{display:none!important}main{padding:0}.card{border:0}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login">
+  <div class="lbox">
+    <h1>Ingresos por Nave</h1>
+    <p>Huachipato Terminal Portuario · Acceso restringido</p>
+    <div class="f"><label>Correo</label><input id="lEmail" type="email" autocomplete="username"></div>
+    <div class="f"><label>Clave</label><input id="lPass" type="password" autocomplete="current-password"></div>
+    <button class="btn o" style="width:100%" onclick="doLogin()">Ingresar</button>
+    <div class="err" id="lErr"></div>
+    <p class="muted" id="demoHint" style="margin:10px 0 0"></p>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" class="hidden">
+<header>
+  <div class="brand">HTP · <span>Ingresos Naves</span></div>
+  <nav>
+    <button data-v="naves" class="on" onclick="go('naves')">Naves</button>
+    <button data-v="editor" onclick="go('editor')">Nueva nave</button>
+    <button data-v="tarifas" onclick="go('tarifas')">Tarifas</button>
+  </nav>
+  <div class="u"><span id="uMail"></span><button class="btn sm g" onclick="doLogout()">Salir</button></div>
+</header>
+<main>
+  <div class="banner hidden" id="demoBanner">Modo demostración: los datos se guardan sólo en este navegador. Configure Firebase en <b>index.html</b> (bloque FIREBASE_CONFIG) para guardar en la nube con clave real.</div>
+  <div class="banner hidden" id="vigBanner"></div>
+
+  <!-- ===== LISTA NAVES ===== -->
+  <div id="v-naves">
+    <div class="kpis" id="kpis"></div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">Naves registradas</h2>
+        <div class="row">
+          <input id="fBus" placeholder="Buscar nave…" style="width:180px" oninput="renderNaves()">
+          <select id="fEst" style="width:150px" onchange="renderNaves()"><option value="">Todos los estados</option><option>En operación</option><option>Finalizada</option><option>Facturada</option></select>
+          <button class="btn g" onclick="exportNaves()">Exportar Excel</button>
+          <button class="btn o" onclick="nuevaNave()">+ Nueva nave</button>
+        </div>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>Nave</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th></th></tr></thead>
+        <tbody id="tNaves"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ===== EDITOR NAVE ===== -->
+  <div id="v-editor" class="hidden">
+    <div class="card">
+      <h2 id="edTit">Nueva nave</h2>
+      <div class="grid">
+        <div><label>Nombre nave</label><input id="nNombre" placeholder="MN …"></div>
+        <div><label>N° viaje / recalada</label><input id="nViaje"></div>
+        <div><label>Agencia</label><input id="nAgencia"></div>
+        <div><label>Tipo de carga</label><input id="nCarga" placeholder="Clinker, carbón, bobinas…"></div>
+        <div><label>Operación</label><select id="nOper"><option>Descarga</option><option>Embarque</option><option>Descarga / Embarque</option></select></div>
+        <div><label>Sitio</label><input id="nSitio" placeholder="Sitio Norte / Sur"></div>
+        <div><label>Eslora (m)</label><input id="nEslora" type="number" step="0.01" oninput="recalc()"></div>
+        <div><label>Toneladas</label><input id="nTon" type="number" step="0.01" oninput="recalc()"></div>
+        <div><label>Atraque</label><input id="nAtr" type="datetime-local" oninput="calcHoras()"></div>
+        <div><label>Desatraque</label><input id="nDes" type="datetime-local" oninput="calcHoras()"></div>
+        <div><label>Horas de estadía</label><input id="nHoras" type="number" step="0.01" oninput="recalc()"></div>
+        <div><label>Estado</label><select id="nEstado"><option>En operación</option><option>Finalizada</option><option>Facturada</option></select></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">Ingresos y servicios</h2>
+        <span class="muted" id="edVig"></span>
+      </div>
+      <p class="muted" style="margin:0 0 10px">Marque los ítems que aplican. La cantidad se calcula sola según la unidad (eslora × horas, horas, toneladas); puede escribir otra cantidad y queda fija. <b>La tarifa es propia de esta nave:</b> edítela si tiene un precio acordado distinto (queda en naranja frente a la pública).</p>
+      <div class="row noprint" style="margin-bottom:10px;gap:8px">
+        <input type="file" id="fTarNave" accept=".xlsx,.xls,.csv" class="hidden" onchange="cargarTarNave(this.files[0])">
+        <button class="btn sm g" onclick="document.getElementById('fTarNave').click()">Cargar tarifas de esta nave (Excel)</button>
+        <button class="btn sm g" onclick="descargarTarNave()">Descargar tarifas de esta nave</button>
+        <button class="btn sm g" onclick="restablecerPub()">Restablecer tarifas públicas</button>
+        <span class="muted" id="edEsp"></span>
+      </div>
+      <div class="tw"><table class="svc">
+        <thead><tr><th style="width:34px"></th><th>N°</th><th>Ítem</th><th>Unidad</th><th class="n">Tarifa nave US$</th><th class="n">Cantidad</th><th class="n">Subtotal US$</th></tr></thead>
+        <tbody id="tSvc"></tbody>
+      </table></div>
+      <div class="tot">Total nave: <span id="edTot">US$ 0,00</span></div>
+      <div style="margin-top:12px"><label>Observaciones</label><input id="nObs"></div>
+      <div class="row noprint" style="margin-top:16px;justify-content:flex-end">
+        <button class="btn r hidden" id="btnDel" onclick="borrarNave()">Eliminar</button>
+        <button class="btn g" onclick="window.print()">Imprimir / PDF</button>
+        <button class="btn g" onclick="go('naves')">Cancelar</button>
+        <button class="btn o" onclick="guardarNave()">Guardar nave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TARIFAS ===== -->
+  <div id="v-tarifas" class="hidden">
+    <div class="card">
+      <h2>Actualizar tarifado</h2>
+      <p class="muted" style="margin:0 0 12px">Suba un Excel (.xlsx) o CSV con las columnas <b>N°, Sección, Ítem, Unidad, Tarifa</b>. Lo más simple: descargue la plantilla con las tarifas actuales, cambie los valores y súbala. Las naves ya guardadas conservan la tarifa con que se registraron.</p>
+      <div class="grid" style="margin-bottom:12px">
+        <div><label>Vigente desde</label><input id="tDesde" type="date"></div>
+        <div><label>Vigente hasta</label><input id="tHasta" type="date"></div>
+      </div>
+      <div class="drop" id="drop">
+        <input type="file" id="fTar" accept=".xlsx,.xls,.csv" class="hidden" onchange="leerArchivo(this.files[0])">
+        Arrastre el archivo aquí o <button class="btn sm" onclick="document.getElementById('fTar').click()">Seleccionar archivo</button>
+      </div>
+      <div id="preview" class="hidden" style="margin-top:14px">
+        <p><b id="prevN"></b> ítems leídos. Revise y confirme:</p>
+        <div class="tw"><table><thead><tr><th>N°</th><th>Sección</th><th>Ítem</th><th>Unidad</th><th class="n">Actual</th><th class="n">Nueva</th></tr></thead><tbody id="tPrev"></tbody></table></div>
+        <div class="row" style="justify-content:flex-end;margin-top:12px">
+          <button class="btn g" onclick="cancelPrev()">Cancelar</button>
+          <button class="btn o" onclick="confirmarTarifas()">Confirmar y publicar tarifas</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <h2 style="margin:0">Tarifado vigente</h2>
+        <button class="btn g" onclick="descargarPlantilla()">Descargar plantilla Excel</button>
+      </div>
+      <p class="muted" id="tVigTxt" style="margin:0 0 10px"></p>
+      <div class="tw"><table><thead><tr><th>N°</th><th>Ítem</th><th>Unidad</th><th class="n">Tarifa</th></tr></thead><tbody id="tTar"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h2>Historial de cargas</h2>
+      <div class="tw"><table><thead><tr><th>Fecha carga</th><th>Vigencia</th><th>Cargado por</th><th class="n">Ítems</th></tr></thead><tbody id="tHist"></tbody></table></div>
+    </div>
+  </div>
+</main>
+</section>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   1) CONFIGURACIÓN FIREBASE
+   Pegue aquí la config de su proyecto (Consola Firebase →
+   Configuración del proyecto → Tus apps → App web).
+   Mientras diga "PEGAR_AQUI" la app funciona en modo demo.
+   ========================================================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBHHlkRvFM7biopLs8ScFVibTOfuB533Bo",
+  authDomain: "ingresos-naves-htp.firebaseapp.com",
+  projectId: "ingresos-naves-htp",
+  storageBucket: "ingresos-naves-htp.firebasestorage.app",
+  messagingSenderId: "903383531150",
+  appId: "1:903383531150:web:344b7e9f026fc85e8c13df"
+};
+const DEMO = FIREBASE_CONFIG.apiKey === "PEGAR_AQUI";
+const DEMO_PASS = "htp2026";
+
+/* =========================================================
+   2) TARIFADO INICIAL (Tarifado Público HTP, abr–sep 2025)
+   base: cómo se calcula la cantidad
+     ESLORA_HORA = eslora × horas · HORA_NAVE = horas estadía
+     TONELADA = toneladas nave · MANUAL = se ingresa a mano
+   ========================================================= */
+const TARIFA_INICIAL = {
+  desde:"2025-04-01", hasta:"2025-09-30",
+  items:[
+    {n:1, sec:"I. Muellajes", desc:"Muellaje a la Nave Graneles Sólidos - Carga General", unidad:"US$ x Metro-Eslora-Hora", tarifa:3.80},
+    {n:2, sec:"I. Muellajes", desc:"Muellaje a la Nave Graneles Líquidos Peligrosos (SODA)", unidad:"US$ x Metro-Eslora-Hora", tarifa:4.70},
+    {n:3, sec:"I. Muellajes", desc:"Muellaje a la Nave Abastecedora combustible abarloada (Indivisible)", unidad:"US$/Hora Nave", tarifa:512.00},
+    {n:4, sec:"I. Muellajes", desc:"Muellaje a Nave eslora inferior 100 mtrs", unidad:"US$/Hora Nave", tarifa:350.00},
+    {n:5, sec:"I. Muellajes", desc:"Muellaje a la Carga - General / Granel sólidos", unidad:"US$/Tonelada", tarifa:3.70},
+    {n:6, sec:"I. Muellajes", desc:"Muellaje a la carga - Rancho de Combustible vía Camión", unidad:"US$/Tonelada", tarifa:4.00},
+    {n:7, sec:"II. Servicios de Embarque/Descarga", desc:"Embarque / Descarga Carga Fraccionada/Granel/Proyecto (Directa)", unidad:"US$ Tonelada / m3", tarifa:null},
+    {n:8, sec:"III. Servicios Especiales", desc:"Servicio de Código ISPS", unidad:"US$", tarifa:1500.00},
+    {n:9, sec:"III. Servicios Especiales", desc:"Arriendo Portalón", unidad:"US$/Turno", tarifa:130.00},
+    {n:10, sec:"III. Servicios Especiales", desc:"Uso de Embarcadero", unidad:"US$/Evento", tarifa:40.00},
+    {n:11, sec:"III. Servicios Especiales", desc:"Uso Grúa Muelle con Gancho 40 SWL", unidad:"US$ / Hora", tarifa:600.00},
+    {n:12, sec:"III. Servicios Especiales", desc:"Uso Grúa Muelle - Pala incl. 40 SWL", unidad:"US$ / Hora", tarifa:800.00},
+    {n:13, sec:"III. Servicios Especiales", desc:"Uso de Explanada muelle para vehículos varios", unidad:"US$/Unidad-Vehículos", tarifa:300.00},
+    {n:14, sec:"III. Servicios Especiales", desc:"Suministro Agua Potable", unidad:"US$/M3", tarifa:4.50},
+    {n:15, sec:"III. Servicios Especiales", desc:"Personal Portuario servicios varios operacionales", unidad:"US$/Hombre /Turno", tarifa:177.00},
+    {n:16, sec:"III. Servicios Especiales", desc:"Equipos, elementos para contención derrames Hidrocarburos", unidad:"USD/Evento / día", tarifa:20000.00},
+    {n:17, sec:"III. Servicios Especiales", desc:"Amarra & Desamarra (Días Hábiles)", unidad:"US$ / Faena", tarifa:660.00},
+    {n:18, sec:"III. Servicios Especiales", desc:"Amarra & Desamarra (Domingo / Festivos)", unidad:"US$ / Faena", tarifa:970.00},
+    {n:19, sec:"III. Servicios Especiales", desc:"Arriendo Grúa horquilla Hasta 6 Tons / Superior a 6 Tons", unidad:"US$ / Hora", tarifa:60.00},
+    {n:20, sec:"III. Servicios Especiales", desc:"Arriendo Palas", unidad:"US$ / Turno Pala", tarifa:1150.00}
+  ]
+};
+
+function inferBase(u){
+  u=(u||"").toLowerCase();
+  if(u.includes("eslora")) return "ESLORA_HORA";
+  if(u.includes("hora nave")) return "HORA_NAVE";
+  if(u.includes("tonelada")) return "TONELADA";
+  return "MANUAL";
+}
+const BASE_TXT={ESLORA_HORA:"eslora×h",HORA_NAVE:"horas",TONELADA:"ton",MANUAL:""};
+
+/* =========================================================
+   3) CAPA DE DATOS (Firebase o localStorage en demo)
+   ========================================================= */
+let db=null, auth=null, user=null;
+if(!DEMO){
+  firebase.initializeApp(FIREBASE_CONFIG);
+  auth=firebase.auth(); db=firebase.firestore();
+}
+const LS={get:k=>JSON.parse(localStorage.getItem("htpIN_"+k)||"null"),set:(k,v)=>localStorage.setItem("htpIN_"+k,JSON.stringify(v))};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+const Data={
+  async getTarifas(){
+    if(DEMO){return LS.get("tarifas")||null;}
+    const d=await db.collection("tarifas").doc("vigente").get();
+    return d.exists?d.data():null;
+  },
+  async saveTarifas(t){
+    t.cargado=new Date().toISOString(); t.por=user?.email||"demo";
+    if(DEMO){LS.set("tarifas",t);const h=LS.get("hist")||[];h.unshift({...t,id:uid()});LS.set("hist",h);return;}
+    const b=db.batch();
+    b.set(db.collection("tarifas").doc("vigente"),t);
+    b.set(db.collection("tarifas_historial").doc(),t);
+    await b.commit();
+  },
+  async hist(){
+    if(DEMO) return LS.get("hist")||[];
+    const s=await db.collection("tarifas_historial").orderBy("cargado","desc").limit(30).get();
+    return s.docs.map(d=>d.data());
+  },
+  async listNaves(){
+    if(DEMO) return LS.get("naves")||[];
+    const s=await db.collection("naves").orderBy("atraque","desc").get();
+    return s.docs.map(d=>({id:d.id,...d.data()}));
+  },
+  async saveNave(n){
+    n.actualizado=new Date().toISOString(); n.por=user?.email||"demo";
+    if(DEMO){const a=LS.get("naves")||[];if(!n.id)n.id=uid();const i=a.findIndex(x=>x.id===n.id);i>=0?a[i]=n:a.push(n);LS.set("naves",a);return n.id;}
+    const {id,...rest}=n;
+    if(id){await db.collection("naves").doc(id).set(rest);return id;}
+    const r=await db.collection("naves").add(rest);return r.id;
+  },
+  async delNave(id){
+    if(DEMO){LS.set("naves",(LS.get("naves")||[]).filter(x=>x.id!==id));return;}
+    await db.collection("naves").doc(id).delete();
+  }
+};
+
+/* =========================================================
+   4) LOGIN
+   ========================================================= */
+const $=id=>document.getElementById(id);
+if(DEMO) $("demoHint").textContent="Modo demo: cualquier correo, clave "+DEMO_PASS;
+$("lPass").addEventListener("keydown",e=>{if(e.key==="Enter")doLogin()});
+
+async function doLogin(){
+  $("lErr").textContent="";
+  const em=$("lEmail").value.trim(), pw=$("lPass").value;
+  if(DEMO){
+    if(pw!==DEMO_PASS){$("lErr").textContent="Clave incorrecta";return;}
+    sessionStorage.setItem("htpIN_user",em||"demo"); onUser({email:em||"demo"}); return;
+  }
+  try{await auth.signInWithEmailAndPassword(em,pw);}
+  catch(e){$("lErr").textContent="Correo o clave incorrectos";}
+}
+function doLogout(){ if(DEMO){sessionStorage.removeItem("htpIN_user");location.reload();} else auth.signOut(); }
+
+if(DEMO){const u=sessionStorage.getItem("htpIN_user"); if(u) onUser({email:u});}
+else auth.onAuthStateChanged(u=>{ if(u) onUser(u); else {user=null;$("app").classList.add("hidden");$("login").classList.remove("hidden");} });
+
+async function onUser(u){
+  user=u; $("uMail").textContent=u.email;
+  $("login").classList.add("hidden"); $("app").classList.remove("hidden");
+  if(DEMO) $("demoBanner").classList.remove("hidden");
+  await cargarTodo();
+}
+
+/* =========================================================
+   5) ESTADO + VISTAS
+   ========================================================= */
+let TAR=null, NAVES=[], EDIT=null, PREV=null;
+const fmt=v=>(v==null||isNaN(v))?"—":v.toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0=v=>(v||0).toLocaleString("es-CL",{maximumFractionDigits:0});
+const fDate=s=>s?new Date(s).toLocaleString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+const fDay=s=>s?s.split("-").reverse().join("-"):"—";
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2400);}
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function cargarTodo(){
+  try{
+    TAR=await Data.getTarifas();
+    if(!TAR){ TAR=JSON.parse(JSON.stringify(TARIFA_INICIAL)); TAR.items.forEach(i=>i.base=inferBase(i.unidad)); await Data.saveTarifas(TAR); }
+    NAVES=await Data.listNaves();
+  }catch(e){console.error(e);toast("Error al leer datos: "+e.message);}
+  vigBanner(); renderNaves(); renderTarifas();
+}
+function vigBanner(){
+  const b=$("vigBanner");
+  if(TAR?.hasta && new Date(TAR.hasta+"T23:59")<new Date()){
+    b.innerHTML="⚠ El tarifado vigente venció el <b>"+fDay(TAR.hasta)+"</b>. Actualícelo en la pestaña Tarifas.";b.classList.remove("hidden");
+  } else b.classList.add("hidden");
+}
+function go(v){
+  if(v==="editor"&&!EDIT){nuevaNave();return;}
+  ["naves","editor","tarifas"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  if(v==="naves"){EDIT=null;renderNaves();}
+  if(v==="tarifas"){renderTarifas();}
+  window.scrollTo(0,0);
+}
+
+/* ---------- Lista naves ---------- */
+function renderNaves(){
+  const q=$("fBus").value.toLowerCase(), est=$("fEst").value;
+  const L=NAVES.filter(n=>(!q||(n.nombre+" "+n.viaje+" "+n.carga).toLowerCase().includes(q))&&(!est||n.estado===est))
+               .sort((a,b)=>(b.atraque||"").localeCompare(a.atraque||""));
+  const pc={"En operación":"p-op","Finalizada":"p-fin","Facturada":"p-fac"};
+  $("tNaves").innerHTML=L.length?L.map(n=>`<tr>
+    <td><b>${esc(n.nombre)}</b></td><td>${esc(n.viaje)}</td><td>${esc(n.carga)}</td><td>${fDate(n.atraque)}</td>
+    <td class="n">${fmt(n.eslora)}</td><td class="n">${fmt(n.horas)}</td><td class="n">${fmt0(n.toneladas)}</td>
+    <td><span class="pill ${pc[n.estado]||""}">${esc(n.estado)}</span>${tieneEsp(n)?' <span class="pill p-esp" title="Tiene tarifas distintas a la pública">Tarifa especial</span>':""}</td>
+    <td class="n"><b>${fmt(n.total)}</b></td>
+    <td><button class="btn sm g" onclick="abrirNave('${n.id}')">Abrir</button></td></tr>`).join("")
+    :`<tr><td colspan="10" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
+  const tot=L.reduce((s,n)=>s+(n.total||0),0), ton=L.reduce((s,n)=>s+(+n.toneladas||0),0);
+  $("kpis").innerHTML=`
+    <div class="kpi"><small>Naves (filtro)</small><b>${L.length}</b></div>
+    <div class="kpi"><small>Ingresos totales</small><b>US$ ${fmt(tot)}</b></div>
+    <div class="kpi"><small>Toneladas</small><b>${fmt0(ton)}</b></div>
+    <div class="kpi"><small>Promedio por nave</small><b>US$ ${fmt(L.length?tot/L.length:0)}</b></div>`;
+}
+
+/* ---------- Editor nave ---------- */
+const CAMPOS={nNombre:"nombre",nViaje:"viaje",nAgencia:"agencia",nCarga:"carga",nOper:"operacion",nSitio:"sitio",nEslora:"eslora",nTon:"toneladas",nAtr:"atraque",nDes:"desatraque",nHoras:"horas",nEstado:"estado",nObs:"obs"};
+function nuevaNave(){
+  EDIT={nombre:"",estado:"En operación",operacion:"Descarga",
+        tarifaVig:{desde:TAR.desde,hasta:TAR.hasta},
+        servicios:TAR.items.map(i=>({...i,tarifaPub:i.tarifa,sel:false,cant:null,auto:true}))};
+  pintarEditor("Nueva nave");
+}
+const esEsp=s=>s.tarifa!==s.tarifaPub;
+const tieneEsp=n=>(n.servicios||[]).some(s=>s.sel&&esEsp(s));
+function abrirNave(id){
+  const n=NAVES.find(x=>x.id===id); if(!n) return;
+  EDIT=JSON.parse(JSON.stringify(n));
+  // agrega ítems nuevos del tarifado que la nave no tenía (sin tocar los ya tarifados)
+  TAR.items.forEach(i=>{ if(!EDIT.servicios.some(s=>s.n===i.n)) EDIT.servicios.push({...i,tarifaPub:i.tarifa,sel:false,cant:null,auto:true}); });
+  EDIT.servicios.forEach(s=>{ if(s.tarifaPub===undefined) s.tarifaPub=s.tarifa; });
+  EDIT.servicios.sort((a,b)=>a.n-b.n);
+  pintarEditor(n.nombre||"Nave");
+}
+function pintarEditor(tit){
+  $("edTit").textContent=tit;
+  for(const [el,k] of Object.entries(CAMPOS)) $(el).value=EDIT[k]??"";
+  $("btnDel").classList.toggle("hidden",!EDIT.id);
+  $("edVig").textContent="Tarifas vigencia "+fDay(EDIT.tarifaVig?.desde)+" al "+fDay(EDIT.tarifaVig?.hasta);
+  ["naves","editor","tarifas"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!=="editor"));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v==="editor"));
+  renderSvc(); window.scrollTo(0,0);
+}
+function calcHoras(){
+  const a=$("nAtr").value,d=$("nDes").value;
+  if(a&&d){const h=(new Date(d)-new Date(a))/36e5; if(h>0)$("nHoras").value=h.toFixed(2);}
+  recalc();
+}
+function autoCant(s){
+  const es=+$("nEslora").value||0, h=+$("nHoras").value||0, t=+$("nTon").value||0;
+  if(s.base==="ESLORA_HORA") return +(es*h).toFixed(2);
+  if(s.base==="HORA_NAVE") return h;
+  if(s.base==="TONELADA") return t;
+  return 1;
+}
+function renderSvc(){
+  let sec="",html="";
+  EDIT.servicios.forEach((s,i)=>{
+    if(s.sec!==sec){sec=s.sec;html+=`<tr class="sec"><td colspan="7">${esc(sec)}</td></tr>`;}
+    if(s.sel&&s.auto) s.cant=autoCant(s);
+    const sub=s.sel&&s.tarifa!=null?(+s.cant||0)*s.tarifa:0;
+    const esp=esEsp(s);
+    const tarCell=`<input class="tar ${esp?"esp":""}" type="number" step="0.01" placeholder="Por cotizar" value="${s.tarifa??""}" onchange="setTar(${i},this.value)">`
+      +(esp?`<span class="pub">pública: ${s.tarifaPub==null?"por cotizar":fmt(s.tarifaPub)}</span>`:"");
+    html+=`<tr class="${s.sel?"":"off"}">
+      <td><input type="checkbox" ${s.sel?"checked":""} onchange="togSvc(${i},this.checked)" style="width:18px;height:18px"></td>
+      <td>${s.n}</td><td>${esc(s.desc)}</td>
+      <td>${esc(s.unidad)}${BASE_TXT[s.base]?`<span class="base">${BASE_TXT[s.base]}</span>`:""}</td>
+      <td class="n">${tarCell}</td>
+      <td class="n">${s.sel?`<input type="number" step="0.01" value="${s.cant??""}" onchange="setCant(${i},this.value)">${!s.auto&&s.base!=="MANUAL"?` <a href="#" title="Volver a cálculo automático" onclick="resetCant(${i});return false">↻</a>`:""}`:""}</td>
+      <td class="n"><b>${s.sel?fmt(sub):""}</b></td></tr>`;
+  });
+  $("tSvc").innerHTML=html;
+  EDIT.total=EDIT.servicios.reduce((t,s)=>t+(s.sel&&s.tarifa!=null?(+s.cant||0)*s.tarifa:0),0);
+  $("edTot").textContent="US$ "+fmt(EDIT.total);
+  const nEsp=EDIT.servicios.filter(esEsp).length;
+  $("edEsp").textContent=nEsp?`${nEsp} ítem(s) con tarifa especial`:"Usando tarifa pública";
+}
+function restablecerPub(){
+  if(!confirm("¿Volver todas las tarifas de esta nave a la tarifa pública?")) return;
+  EDIT.servicios.forEach(s=>s.tarifa=s.tarifaPub); renderSvc();
+}
+function descargarTarNave(){
+  const rows=EDIT.servicios.map(s=>({"N°":s.n,"Sección":s.sec,"Ítem":s.desc,"Unidad":s.unidad,"Tarifa":s.tarifa,"Tarifa pública":s.tarifaPub}));
+  const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=[{wch:5},{wch:34},{wch:62},{wch:26},{wch:12},{wch:14}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Tarifas nave");
+  XLSX.writeFile(wb,"Tarifas_"+(($("nNombre").value||"nave").replace(/[^\w\-]+/g,"_"))+".xlsx");
+}
+function cargarTarNave(f){
+  leerTarifas(f,items=>{
+    let c=0;
+    items.forEach(it=>{
+      let s=EDIT.servicios.find(x=>x.n===it.n);
+      if(s){ if(s.tarifa!==it.tarifa){s.tarifa=it.tarifa;c++;} }
+      else { EDIT.servicios.push({...it,tarifaPub:null,sel:false,cant:null,auto:true}); c++; }
+    });
+    EDIT.servicios.sort((a,b)=>a.n-b.n); renderSvc();
+    toast(c?`${c} tarifa(s) actualizadas para esta nave`:"Sin cambios respecto a la nave");
+  });
+  $("fTarNave").value="";
+}
+function togSvc(i,v){const s=EDIT.servicios[i];s.sel=v;if(v&&s.cant==null){s.auto=true;}renderSvc();}
+function setCant(i,v){const s=EDIT.servicios[i];s.cant=+v;s.auto=false;renderSvc();}
+function resetCant(i){EDIT.servicios[i].auto=true;renderSvc();}
+function setTar(i,v){EDIT.servicios[i].tarifa=v===""?null:+v;renderSvc();}
+function recalc(){ if(EDIT) renderSvc(); }
+
+async function guardarNave(){
+  for(const [el,k] of Object.entries(CAMPOS)){
+    const v=$(el).value; EDIT[k]=["eslora","toneladas","horas"].includes(k)?(v===""?null:+v):v;
+  }
+  if(!EDIT.nombre){toast("Ingrese el nombre de la nave");return;}
+  renderSvc();
+  try{ EDIT.id=await Data.saveNave(EDIT); NAVES=await Data.listNaves(); toast("Nave guardada"); go("naves"); }
+  catch(e){toast("Error al guardar: "+e.message);}
+}
+async function borrarNave(){
+  if(!EDIT?.id||!confirm("¿Eliminar la nave "+EDIT.nombre+"?")) return;
+  await Data.delNave(EDIT.id); NAVES=await Data.listNaves(); toast("Nave eliminada"); go("naves");
+}
+
+/* ---------- Exportar naves ---------- */
+function exportNaves(){
+  const res=NAVES.map(n=>({Nave:n.nombre,Viaje:n.viaje,Agencia:n.agencia,Carga:n.carga,Operación:n.operacion,Sitio:n.sitio,
+    Atraque:fDate(n.atraque),Desatraque:fDate(n.desatraque),"Eslora (m)":n.eslora,Horas:n.horas,Toneladas:n.toneladas,Estado:n.estado,"Total US$":+(n.total||0).toFixed(2)}));
+  const det=[];
+  NAVES.forEach(n=>n.servicios.filter(s=>s.sel).forEach(s=>det.push({Nave:n.nombre,Viaje:n.viaje,"N°":s.n,Ítem:s.desc,Unidad:s.unidad,"Tarifa pública US$":s.tarifaPub??s.tarifa,"Tarifa aplicada US$":s.tarifa,"Especial":esEsp(s)?"Sí":"",Cantidad:s.cant,"Subtotal US$":+((+s.cant||0)*(s.tarifa||0)).toFixed(2)})));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),"Resumen naves");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(det),"Detalle servicios");
+  XLSX.writeFile(wb,"Ingresos_Naves_HTP.xlsx");
+}
+
+/* ---------- Tarifas ---------- */
+function renderTarifas(){
+  if(!TAR) return;
+  $("tVigTxt").textContent=`Vigencia ${fDay(TAR.desde)} al ${fDay(TAR.hasta)} · cargado ${fDate(TAR.cargado)} por ${TAR.por||"—"}`;
+  let sec="";
+  $("tTar").innerHTML=TAR.items.map(i=>{
+    let h="";if(i.sec!==sec){sec=i.sec;h=`<tr class="sec"><td colspan="4">${esc(sec)}</td></tr>`;}
+    return h+`<tr><td>${i.n}</td><td>${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${i.tarifa==null?"Por cotizar":fmt(i.tarifa)}</td></tr>`;
+  }).join("");
+  Data.hist().then(H=>{$("tHist").innerHTML=H.map(h=>`<tr><td>${fDate(h.cargado)}</td><td>${fDay(h.desde)} al ${fDay(h.hasta)}</td><td>${esc(h.por)}</td><td class="n">${h.items.length}</td></tr>`).join("")||`<tr><td colspan="4" class="muted">Sin historial</td></tr>`;});
+}
+function descargarPlantilla(){
+  const rows=TAR.items.map(i=>({"N°":i.n,"Sección":i.sec,"Ítem":i.desc,"Unidad":i.unidad,"Tarifa":i.tarifa}));
+  const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=[{wch:5},{wch:34},{wch:62},{wch:26},{wch:12}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Tarifas");
+  XLSX.writeFile(wb,"Plantilla_Tarifas_HTP.xlsx");
+}
+const drop=$("drop");
+["dragover","dragenter"].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.style.borderColor="var(--orange)";}));
+["dragleave","drop"].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.style.borderColor="";}));
+drop.addEventListener("drop",ev=>{const f=ev.dataTransfer.files[0];if(f)leerArchivo(f);});
+
+function num(v){
+  if(v==null||v==="") return null; if(typeof v==="number") return v;
+  let s=String(v).replace(/[^\d,.\-]/g,"");
+  if(s.includes(",")&&s.includes(".")) s=s.lastIndexOf(",")>s.lastIndexOf(".")?s.replace(/\./g,"").replace(",","."):s.replace(/,/g,"");
+  else if(s.includes(",")) s=s.replace(",",".");
+  const n=parseFloat(s); return isNaN(n)?null:n;
+}
+function leerArchivo(f){
+  leerTarifas(f,items=>{PREV=items;mostrarPrev();});
+  $("fTar").value="";
+}
+function leerTarifas(f,cb){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
+      const key=(o,...ks)=>{for(const k of Object.keys(o)){const kk=k.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();if(ks.some(x=>kk.startsWith(x)))return o[k];}return "";};
+      let sec="";
+      const items=rows.map(o=>{
+        const s=key(o,"seccion"); if(s) sec=s;
+        const d=key(o,"item","servicio","descripcion");
+        if(!d) return null;
+        const u=key(o,"unidad");
+        const tk=Object.keys(o).find(k=>{const kk=k.toLowerCase().trim();return (kk.startsWith("tarifa")||kk.startsWith("valor"))&&!kk.includes("publica")&&!kk.includes("pública");});
+        return {n:num(key(o,"n","nro","numero"))||0, sec:sec||"Otros", desc:String(d).trim(), unidad:String(u).trim(), tarifa:num(tk?o[tk]:""), base:inferBase(u)};
+      }).filter(Boolean);
+      if(!items.length){toast("No se encontraron filas. Revise los encabezados de columna.");return;}
+      items.forEach((it,k)=>{if(!it.n)it.n=k+1;});
+      cb(items);
+    }catch(err){toast("No se pudo leer el archivo: "+err.message);}
+  };
+  r.readAsArrayBuffer(f);
+}
+function mostrarPrev(){
+  $("prevN").textContent=PREV.length;
+  $("tPrev").innerHTML=PREV.map(p=>{
+    const a=TAR.items.find(i=>i.n===p.n);const cambia=a&&a.tarifa!==p.tarifa;
+    return `<tr><td>${p.n}</td><td>${esc(p.sec)}</td><td>${esc(p.desc)}</td><td>${esc(p.unidad)}</td>
+      <td class="n">${a?fmt(a.tarifa):"<i>nuevo</i>"}</td><td class="n" style="${cambia?"color:var(--orange);font-weight:700":""}">${p.tarifa==null?"Por cotizar":fmt(p.tarifa)}</td></tr>`;}).join("");
+  $("preview").classList.remove("hidden");
+}
+function cancelPrev(){PREV=null;$("preview").classList.add("hidden");}
+async function confirmarTarifas(){
+  const d=$("tDesde").value,h=$("tHasta").value;
+  if(!d||!h){toast("Indique la vigencia desde / hasta");return;}
+  const nuevo={desde:d,hasta:h,items:PREV};
+  try{await Data.saveTarifas(nuevo); TAR=await Data.getTarifas(); cancelPrev(); vigBanner(); renderTarifas(); toast("Tarifado publicado");}
+  catch(e){toast("Error: "+e.message);}
+}
+</script>
+</body>
+</html>

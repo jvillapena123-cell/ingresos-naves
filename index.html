@@ -182,7 +182,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         <div><label>Operación</label><select id="nOper"><option>Descarga</option><option>Embarque</option><option>Descarga / Embarque</option></select></div>
         <div><label>Sitio</label><input id="nSitio" placeholder="Sitio Norte / Sur"></div>
         <div><label>Eslora (m)</label><input id="nEslora" type="number" step="0.01" oninput="recalc()"></div>
-        <div><label>Toneladas</label><input id="nTon" type="number" step="0.01" oninput="recalc()"></div>
+        <div><label>Toneladas totales MN</label><input id="nTon" type="number" step="0.01" oninput="recalc()" style="font-weight:700"><span class="muted" id="tonInfo" style="display:block;margin-top:3px">Límite para repartir por cliente</span></div>
         <div><label>Atraque</label><input id="nAtr" type="datetime-local" oninput="calcHoras()"></div>
         <div><label>Desatraque</label><input id="nDes" type="datetime-local" oninput="calcHoras()"></div>
         <div><label>Horas de estadía</label><input id="nHoras" type="number" step="0.01" oninput="recalc()"></div>
@@ -687,6 +687,11 @@ function renderSvc(){
   EDIT.total=EDIT.servicios.reduce((t,s)=>t+subSvc(s),0);
   $("edTot").textContent="US$ "+fmt(EDIT.total);
   renderCliTab();
+  const its=EDIT.servicios.filter(s=>s.sel&&tieneLin(s)), ti=$("tonInfo");
+  if(!tonNave) ti.innerHTML='Límite para repartir por cliente';
+  else if(!its.length) ti.innerHTML='Límite para repartir por cliente';
+  else ti.innerHTML=its.map(s=>{const d=+(tonNave-s.cant).toFixed(2);
+    return `<span style="color:${d===0?"var(--ok)":"var(--bad)"}">${/transferencia/.test(normD(s.desc))?"Transf.":"Muellaje"}: ${fmt(s.cant)} t${d===0?" ✓":d>0?` (faltan ${fmt(d)})`:` (exceso ${fmt(-d)})`}</span>`;}).join(" · ");
   const pc=porCliente(EDIT,$("nCliente").value.trim());
   $("edPorCli").innerHTML=pc.length>1?"Por cliente: "+pc.map(([c,v])=>`<b>${esc(c)}</b> US$ ${fmt(v)}`).join(" · "):"";
   const dol=+$("nDolar").value||EDIT.dolar;
@@ -778,8 +783,10 @@ function cargarTarNave(f){
 function togSvc(i,v){const s=EDIT.servicios[i];s.sel=v;if(v&&s.cant==null){s.auto=true;}if(!v&&MULTI(s))s.lineas=[];renderSvc();}
 function addLin(i){
   const s=EDIT.servicios[i], tonNave=+$("nTon").value||0;
-  s.lineas.forEach(l=>l.auto=false);
+  if(!tonNave){toast("Ingrese primero las Toneladas totales MN");$("nTon").focus();return;}
   const usadas=s.lineas.reduce((t,l)=>t+(+l.ton||0),0);
+  if(usadas>=tonNave){toast(`Ya están asignadas las ${fmt(tonNave)} t de la nave. Baje las toneladas de otro cliente para agregar uno nuevo.`);return;}
+  s.lineas.forEach(l=>l.auto=false);
   s.lineas.push({cliente:"",tarifa:s.tarifa??s.tarifaPub,ton:Math.max(+(tonNave-usadas).toFixed(2),0),auto:false});
   renderSvc();
   const ins=$("tSvc").querySelectorAll("tr.lin td.cl input");
@@ -792,9 +799,14 @@ function delLin(i,j){
   renderSvc();
 }
 function setLin(i,j,k,v){
-  const l=EDIT.servicios[i].lineas[j];
+  const s=EDIT.servicios[i], l=s.lineas[j];
   if(k==="cliente") l.cliente=v.trim();
   else { l[k]=v===""?null:+v; if(k==="ton") l.auto=false; }
+  if(k==="ton"&&l.ton!=null){
+    const tonNave=+$("nTon").value||0;
+    const otras=s.lineas.reduce((t,x,q)=>q===j?t:t+(+x.ton||0),0), max=Math.max(+(tonNave-otras).toFixed(2),0);
+    if(tonNave&&l.ton>max){l.ton=max;toast(`Máximo ${fmt(max)} t para este cliente (total MN ${fmt(tonNave)} t)`);}
+  }
   renderSvc();
 }
 /* Tabla resumen: total por cliente de los ítems con desglose (Transferencia, Muellaje a la Carga) */

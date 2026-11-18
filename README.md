@@ -44,6 +44,7 @@ La config de Firebase en el HTML no es secreta (es normal que sea pública); la 
   - El resto (turnos, eventos, faenas, m³…) se ingresa a mano.
 - **Tarifas:** descargue la plantilla Excel, cambie valores y vuelva a subirla indicando la vigencia. Se muestra una vista previa con los cambios en naranja antes de publicar. Cada carga queda en el historial.
 - **Tarifa por nave:** en cada nave la tarifa de cada ítem es editable. Si difiere de la pública queda en naranja y muestra la pública debajo; la nave se marca "Tarifa especial" en el listado. También puede cargar un Excel de tarifas sólo para esa nave (mismo formato de plantilla), descargar las tarifas de la nave o restablecer las públicas. El Excel exportado muestra tarifa pública vs. aplicada.
+- **Dólar observado:** al ingresar la fecha de desatraque la app trae el dólar observado de ese día (Banco Central vía mindicador.cl). Si cae fin de semana o feriado usa el último día hábil anterior. Se puede escribir a mano. Calcula el total en pesos y se guarda con la nave.
 - Cada nave guarda la tarifa con que se registró: actualizar el tarifado no altera naves ya cargadas.
 
 ## Modo demo

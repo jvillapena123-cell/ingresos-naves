@@ -117,7 +117,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         </div>
       </div>
       <div class="tw"><table>
-        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th></th></tr></thead>
+        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th class="n">Dólar obs.</th><th class="n">Total CLP</th><th></th></tr></thead>
         <tbody id="tNaves"></tbody>
       </table></div>
     </div>
@@ -140,6 +140,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         <div><label>Atraque</label><input id="nAtr" type="datetime-local" oninput="calcHoras()"></div>
         <div><label>Desatraque</label><input id="nDes" type="datetime-local" oninput="calcHoras()"></div>
         <div><label>Horas de estadía</label><input id="nHoras" type="number" step="0.01" oninput="recalc()"></div>
+        <div><label>Dólar observado (día desatraque)</label><input id="nDolar" type="number" step="0.01" oninput="dolarManual()" placeholder="Se obtiene al ingresar desatraque"><span class="muted" id="dolarInfo" style="display:block;margin-top:3px"></span></div>
         <div><label>Estado</label><select id="nEstado"><option>En operación</option><option>Finalizada</option><option>Facturada</option></select></div>
       </div>
     </div>
@@ -163,6 +164,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         <tbody id="tSvc"></tbody>
       </table></div>
       <div class="tot">Total nave: <span id="edTot">US$ 0,00</span></div>
+      <div class="tot" style="font-size:15px;margin-top:4px">Total en pesos: <span id="edTotClp">—</span></div>
       <div style="margin-top:12px"><label>Observaciones</label><input id="nObs"></div>
       <div class="row noprint" style="margin-top:16px;justify-content:flex-end">
         <button class="btn r hidden" id="btnDel" onclick="borrarNave()">Eliminar</button>
@@ -396,12 +398,16 @@ function renderNaves(){
     <td class="n">${fmt(n.eslora)}</td><td class="n">${fmt(n.horas)}</td><td class="n">${fmt0(n.toneladas)}</td>
     <td><span class="pill ${pc[n.estado]||""}">${esc(n.estado)}</span>${tieneEsp(n)?' <span class="pill p-esp" title="Tiene tarifas distintas a la pública">Tarifa especial</span>':""}</td>
     <td class="n"><b>${fmt(n.total)}</b></td>
+    <td class="n">${n.dolar?fmt(n.dolar):'<span class="muted">—</span>'}</td>
+    <td class="n">${n.dolar?"$ "+fmt0(n.total*n.dolar):'<span class="muted">—</span>'}</td>
     <td><button class="btn sm g" onclick="abrirNave('${n.id}')">Abrir</button></td></tr>`).join("")
-    :`<tr><td colspan="11"class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
+    :`<tr><td colspan="13" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
   const tot=L.reduce((s,n)=>s+(n.total||0),0), ton=L.reduce((s,n)=>s+(+n.toneladas||0),0);
+  const clp=L.reduce((s,n)=>s+(n.dolar?(n.total||0)*n.dolar:0),0), sinD=L.filter(n=>!n.dolar).length;
   $("kpis").innerHTML=`
     <div class="kpi"><small>Naves (filtro)</small><b>${L.length}</b></div>
     <div class="kpi"><small>Ingresos totales</small><b>US$ ${fmt(tot)}</b></div>
+    <div class="kpi"><small>Ingresos en pesos${sinD?` (${sinD} sin dólar)`:""}</small><b>$ ${fmt0(clp)}</b></div>
     <div class="kpi"><small>Toneladas</small><b>${fmt0(ton)}</b></div>
     <div class="kpi"><small>Promedio por nave</small><b>US$ ${fmt(L.length?tot/L.length:0)}</b></div>`;
 }
@@ -422,7 +428,7 @@ function copiarTarCliente(){
   EDIT.servicios.forEach(s=>{const o=u.servicios.find(x=>x.n===s.n); if(o&&o.tarifa!==s.tarifa){s.tarifa=o.tarifa;k++;}});
   renderSvc(); toast(k?`${k} tarifa(s) copiadas de ${u.nombre}`:"Las tarifas ya coinciden");
 }
-const CAMPOS={nNombre:"nombre",nCliente:"cliente",nViaje:"viaje",nAgencia:"agencia",nCarga:"carga",nOper:"operacion",nSitio:"sitio",nEslora:"eslora",nTon:"toneladas",nAtr:"atraque",nDes:"desatraque",nHoras:"horas",nEstado:"estado",nObs:"obs"};
+const CAMPOS={nNombre:"nombre",nCliente:"cliente",nViaje:"viaje",nAgencia:"agencia",nCarga:"carga",nOper:"operacion",nSitio:"sitio",nEslora:"eslora",nTon:"toneladas",nAtr:"atraque",nDes:"desatraque",nHoras:"horas",nDolar:"dolar",nEstado:"estado",nObs:"obs"};
 function nuevaNave(){
   EDIT={nombre:"",estado:"En operación",operacion:"Descarga",
         tarifaVig:{desde:TAR.desde,hasta:TAR.hasta},
@@ -447,12 +453,52 @@ function pintarEditor(tit){
   $("edVig").textContent="Tarifas vigencia "+fDay(EDIT.tarifaVig?.desde)+" al "+fDay(EDIT.tarifaVig?.hasta);
   ["naves","editor","tarifas"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!=="editor"));
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v==="editor"));
-  renderSvc(); sugerirTarCliente(); window.scrollTo(0,0);
+  renderSvc(); sugerirTarCliente(); pintarDolarInfo(); window.scrollTo(0,0);
+  if(EDIT.desatraque && !EDIT.dolar) obtenerDolar();
 }
 function calcHoras(){
   const a=$("nAtr").value,d=$("nDes").value;
   if(a&&d){const h=(new Date(d)-new Date(a))/36e5; if(h>0)$("nHoras").value=h.toFixed(2);}
   recalc();
+  if(d && d.slice(0,10)!==(EDIT.dolarDia||"")) obtenerDolar();
+}
+
+/* ---------- Dólar observado (Banco Central vía mindicador.cl) ---------- */
+const DOLAR_CACHE={};
+async function serieDolar(anio){
+  if(!DOLAR_CACHE[anio]){
+    const r=await fetch(`https://mindicador.cl/api/dolar/${anio}`);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    DOLAR_CACHE[anio]=(await r.json()).serie.map(x=>({f:x.fecha.slice(0,10),v:x.valor}));
+  }
+  return DOLAR_CACHE[anio];
+}
+async function obtenerDolar(){
+  const d=$("nDes").value; if(!d) return;
+  const dia=d.slice(0,10), anio=+dia.slice(0,4);
+  $("dolarInfo").textContent="Buscando dólar observado…";
+  try{
+    let s=(await serieDolar(anio)).filter(x=>x.f<=dia);
+    if(!s.length) s=(await serieDolar(anio-1)).filter(x=>x.f<=dia);
+    if(!s.length) throw new Error("sin datos");
+    const m=s.reduce((a,b)=>a.f>b.f?a:b);
+    EDIT.dolar=m.v; EDIT.dolarDia=dia; EDIT.dolarFecha=m.f; EDIT.dolarFuente="Banco Central (mindicador.cl)";
+    $("nDolar").value=m.v; pintarDolarInfo(); renderSvc();
+  }catch(e){
+    $("dolarInfo").innerHTML='<span style="color:var(--bad)">No se pudo obtener el dólar. Ingréselo a mano.</span>';
+  }
+}
+function dolarManual(){
+  EDIT.dolar=+$("nDolar").value||null; EDIT.dolarDia=($("nDes").value||"").slice(0,10);
+  EDIT.dolarFecha=EDIT.dolarDia; EDIT.dolarFuente="Manual"; pintarDolarInfo(); renderSvc();
+}
+function pintarDolarInfo(){
+  const el=$("dolarInfo");
+  if(!EDIT.dolar){el.textContent="";return;}
+  if(EDIT.dolarFuente==="Manual"){el.textContent="Ingresado a mano";return;}
+  el.textContent=EDIT.dolarFecha!==EDIT.dolarDia
+    ?`Valor del ${fDay(EDIT.dolarFecha)} (último hábil antes del desatraque)`
+    :`Dólar observado del ${fDay(EDIT.dolarFecha)}`;
 }
 function autoCant(s){
   const es=+$("nEslora").value||0, h=+$("nHoras").value||0, t=+$("nTon").value||0;
@@ -481,6 +527,8 @@ function renderSvc(){
   $("tSvc").innerHTML=html;
   EDIT.total=EDIT.servicios.reduce((t,s)=>t+(s.sel&&s.tarifa!=null?(+s.cant||0)*s.tarifa:0),0);
   $("edTot").textContent="US$ "+fmt(EDIT.total);
+  const dol=+$("nDolar").value||EDIT.dolar;
+  $("edTotClp").textContent=dol?`$ ${fmt0(EDIT.total*dol)}  (US$ ${fmt(EDIT.total)} × $ ${fmt(dol)})`:"Falta dólar observado (ingrese fecha de desatraque)";
   const nEsp=EDIT.servicios.filter(esEsp).length;
   $("edEsp").textContent=nEsp?`${nEsp} ítem(s) con tarifa especial`:"Usando tarifa pública";
 }
@@ -515,7 +563,7 @@ function recalc(){ if(EDIT) renderSvc(); }
 
 async function guardarNave(){
   for(const [el,k] of Object.entries(CAMPOS)){
-    const v=$(el).value; EDIT[k]=["eslora","toneladas","horas"].includes(k)?(v===""?null:+v):v;
+    const v=$(el).value; EDIT[k]=["eslora","toneladas","horas","dolar"].includes(k)?(v===""?null:+v):v;
   }
   if(!EDIT.nombre){toast("Ingrese el nombre de la nave");return;}
   renderSvc();
@@ -530,7 +578,9 @@ async function borrarNave(){
 /* ---------- Exportar naves ---------- */
 function exportNaves(){
   const res=NAVES.map(n=>({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,Agencia:n.agencia,Carga:n.carga,Operación:n.operacion,Sitio:n.sitio,
-    Atraque:fDate(n.atraque),Desatraque:fDate(n.desatraque),"Eslora (m)":n.eslora,Horas:n.horas,Toneladas:n.toneladas,Estado:n.estado,"Total US$":+(n.total||0).toFixed(2)}));
+    Atraque:fDate(n.atraque),Desatraque:fDate(n.desatraque),"Eslora (m)":n.eslora,Horas:n.horas,Toneladas:n.toneladas,Estado:n.estado,"Total US$":+(n.total||0).toFixed(2),
+    "Dólar observado":n.dolar||"","Fecha dólar":n.dolarFecha?fDay(n.dolarFecha):"","Fuente dólar":n.dolarFuente||"",
+    "Total CLP":n.dolar?Math.round((n.total||0)*n.dolar):""}));
   const det=[];
   NAVES.forEach(n=>n.servicios.filter(s=>s.sel).forEach(s=>det.push({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,"N°":s.n,Ítem:s.desc,Unidad:s.unidad,"Tarifa pública US$":s.tarifaPub??s.tarifa,"Tarifa aplicada US$":s.tarifa,"Especial":esEsp(s)?"Sí":"",Cantidad:s.cant,"Subtotal US$":+((+s.cant||0)*(s.tarifa||0)).toFixed(2)})));
   const wb=XLSX.utils.book_new();

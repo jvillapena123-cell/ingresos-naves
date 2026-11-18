@@ -69,6 +69,13 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
 .svc input.tar{width:100px;padding:6px 8px;text-align:right}
 .svc input.esp{border-color:var(--orange);background:#fff4ec;font-weight:700;color:#b0571f}
 .pub{display:block;font-size:10px;color:var(--mut)}
+.svc tr.lin td{background:#fbfcfe;border-bottom:1px dashed var(--line);padding:6px 8px}
+.svc tr.lin td.cl{display:flex;gap:6px;align-items:center;padding-left:18px}
+.svc tr.lin td.cl::before{content:"↳";color:var(--mut)}
+.svc tr.lin td.cl input{min-width:180px;padding:6px 8px}
+.svc tr.lin-add td{background:#fbfcfe;padding:6px 8px 10px 18px}
+.asig{font-size:11px;margin-left:10px}.asig.ok{color:var(--ok)}.asig.bad{color:var(--bad)}
+.porcli{font-size:12px;color:var(--mut);text-align:right;margin-top:6px}
 .p-esp{background:#fff1e8;color:#b0571f}
 .tot{font-size:18px;font-weight:700;color:var(--navy);text-align:right;margin-top:12px}
 .tot span{color:var(--orange)}
@@ -200,6 +207,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         <tbody id="tSvc"></tbody>
       </table></div>
       <div class="tot">Total nave: <span id="edTot">US$ 0,00</span></div>
+      <div class="porcli" id="edPorCli"></div>
       <div class="tot" style="font-size:15px;margin-top:4px">Total en pesos: <span id="edTotClp">—</span></div>
     </div>
 
@@ -473,7 +481,7 @@ function renderNaves(){
   const cls=clientes(), fc=$("fCli");
   fc.innerHTML='<option value="">Todos los clientes</option>'+cls.map(c=>`<option ${c===cli?"selected":""}>${esc(c)}</option>`).join("");
   $("dlClientes").innerHTML=cls.map(c=>`<option value="${esc(c)}">`).join("");
-  const L=NAVES.filter(n=>(!q||(n.nombre+" "+(n.cliente||"")+" "+n.viaje+" "+n.carga).toLowerCase().includes(q))&&(!est||n.estado===est)&&(!cli||n.cliente===cli))
+  const L=NAVES.filter(n=>(!q||(n.nombre+" "+(n.cliente||"")+" "+n.viaje+" "+n.carga).toLowerCase().includes(q))&&(!est||n.estado===est)&&(!cli||n.cliente===cli||cliLineas(n).includes(cli)))
                .sort((a,b)=>(b.atraque||"").localeCompare(a.atraque||""));
   const pc={"En operación":"p-op","Finalizada":"p-fin","Facturada":"p-fac"};
   $("tNaves").innerHTML=L.length?L.map(n=>`<tr>
@@ -513,7 +521,8 @@ function renderNaves(){
 }
 
 /* ---------- Editor nave ---------- */
-const clientes=()=>[...new Set(NAVES.map(n=>(n.cliente||"").trim()).filter(Boolean))].sort();
+const cliLineas=n=>(n.servicios||[]).flatMap(s=>s.sel&&Array.isArray(s.lineas)?s.lineas.map(l=>(l.cliente||"").trim()):[]);
+const clientes=()=>[...new Set(NAVES.flatMap(n=>[(n.cliente||"").trim(),...cliLineas(n)]).filter(Boolean))].sort();
 function ultimaNaveCliente(c){
   return NAVES.filter(n=>n.cliente===c&&n.id!==EDIT?.id).sort((a,b)=>(b.atraque||b.actualizado||"").localeCompare(a.atraque||a.actualizado||""))[0];
 }
@@ -525,7 +534,10 @@ function sugerirTarCliente(){
 function copiarTarCliente(){
   const c=$("nCliente").value.trim(), u=ultimaNaveCliente(c); if(!u) return;
   let k=0;
-  EDIT.servicios.forEach(s=>{const o=u.servicios.find(x=>x.n===s.n); if(o&&o.tarifa!==s.tarifa){s.tarifa=o.tarifa;k++;}});
+  EDIT.servicios.forEach(s=>{const o=u.servicios.find(x=>x.n===s.n); if(!o) return;
+    if(o.tarifa!==s.tarifa){s.tarifa=o.tarifa;k++;}
+    (s.lineas||[]).forEach(l=>{const ol=(o.lineas||[]).find(x=>x.cliente===(l.cliente||c));const t=ol?ol.tarifa:o.tarifa;if(t!==l.tarifa){l.tarifa=t;k++;}});
+  });
   renderSvc(); toast(k?`${k} tarifa(s) copiadas de ${u.nombre}`:"Las tarifas ya coinciden");
 }
 const CAMPOS={nNombre:"nombre",nCliente:"cliente",nViaje:"viaje",nAgencia:"agencia",nCarga:"carga",nOper:"operacion",nSitio:"sitio",nEslora:"eslora",nTon:"toneladas",nAtr:"atraque",nDes:"desatraque",nHoras:"horas",nDolar:"dolar",nEstado:"estado",nObs:"obs"};
@@ -535,11 +547,23 @@ function nuevaNave(){
         servicios:TAR.items.map(i=>({...i,tarifaPub:i.tarifa,sel:false,cant:null,auto:true}))};
   pintarEditor("Nueva nave");
 }
-const esEsp=s=>s.tarifa!==s.tarifaPub;
+/* Ítems por cliente: Transferencia y Muellaje a la Carga admiten varias líneas (cliente · tarifa · toneladas) */
+const MULTI=s=>/transferencia|muellaje a la carga/.test(normD(s.desc));
+const tieneLin=s=>MULTI(s)&&Array.isArray(s.lineas)&&s.lineas.length>0;
+const subSvc=s=>{
+  if(!s.sel) return 0;
+  if(tieneLin(s)) return s.lineas.reduce((t,l)=>t+(+l.ton||0)*(+l.tarifa||0),0);
+  return s.tarifa!=null?(+s.cant||0)*s.tarifa:0;
+};
+const esEsp=s=>tieneLin(s)?s.lineas.some(l=>l.tarifa!==s.tarifaPub):s.tarifa!==s.tarifaPub;
+function migrarLineas(n){
+  (n.servicios||[]).forEach(s=>{ if(MULTI(s)&&s.sel&&!tieneLin(s)) s.lineas=[{cliente:n.cliente||"",tarifa:s.tarifa,ton:s.cant,auto:!!s.auto}]; });
+  return n;
+}
 const tieneEsp=n=>(n.servicios||[]).some(s=>s.sel&&esEsp(s));
 function abrirNave(id){
   const n=NAVES.find(x=>x.id===id); if(!n) return;
-  EDIT=JSON.parse(JSON.stringify(n));
+  EDIT=migrarLineas(JSON.parse(JSON.stringify(n)));
   // agrega ítems nuevos del tarifado que la nave no tenía (sin tocar los ya tarifados)
   const tDescs=new Set(TAR.items.map(i=>normD(i.desc)));
   TAR.items.forEach(i=>{ if(!EDIT.servicios.some(s=>normD(s.desc)===normD(i.desc)||(s.n===i.n&&!tDescs.has(normD(s.desc))))) EDIT.servicios.push({...i,tarifaPub:i.tarifa,sel:false,cant:null,auto:true}); });
@@ -610,10 +634,39 @@ function autoCant(s){
 }
 function renderSvc(){
   let sec="",html="";
+  const tonNave=+$("nTon").value||0;
   EDIT.servicios.forEach((s,i)=>{
     if(s.sec!==sec){sec=s.sec;html+=`<tr class="sec"><td colspan="7">${esc(sec)}</td></tr>`;}
+    if(s.sel&&MULTI(s)){
+      if(!tieneLin(s)) s.lineas=[{cliente:$("nCliente").value.trim(),tarifa:s.tarifa,ton:tonNave,auto:true}];
+      if(s.lineas.length===1&&s.lineas[0].auto) s.lineas[0].ton=tonNave;
+      s.cant=+s.lineas.reduce((t,l)=>t+(+l.ton||0),0).toFixed(2);
+      const sub=subSvc(s), dif=+(tonNave-s.cant).toFixed(2);
+      const asig=tonNave?(dif===0?`<span class="asig ok">✓ ${fmt0(s.cant)} t asignadas (total nave)</span>`
+        :`<span class="asig bad">${fmt(s.cant)} de ${fmt(tonNave)} t de la nave · ${dif>0?"faltan "+fmt(dif):"exceso "+fmt(-dif)} t</span>`):"";
+      html+=`<tr>
+        <td><input type="checkbox" checked onchange="togSvc(${i},this.checked)" style="width:18px;height:18px"></td>
+        <td>${s.n}</td><td>${esc(s.desc)} <span class="pill p-op">${s.lineas.length} cliente${s.lineas.length===1?"":"s"}</span></td>
+        <td>${esc(s.unidad)}<span class="base">por cliente</span></td>
+        <td class="n muted">por cliente</td>
+        <td class="n"><b>${fmt(s.cant)}</b></td>
+        <td class="n"><b>${fmt(sub)}</b></td></tr>`;
+      s.lineas.forEach((l,j)=>{
+        const e=l.tarifa!==s.tarifaPub;
+        html+=`<tr class="lin">
+          <td></td><td></td>
+          <td class="cl"><input list="dlClientes" placeholder="Cliente" value="${esc(l.cliente)}" onchange="setLin(${i},${j},'cliente',this.value)">
+            <button class="btn sm r" title="Quitar cliente" onclick="delLin(${i},${j})">✕</button></td>
+          <td class="muted">Toneladas del cliente →</td>
+          <td class="n"><input class="tar ${e?"esp":""}" type="number" step="0.01" placeholder="Tarifa" value="${l.tarifa??""}" onchange="setLin(${i},${j},'tarifa',this.value)">${e?`<span class="pub">pública: ${s.tarifaPub==null?"por cotizar":fmt(s.tarifaPub)}</span>`:""}</td>
+          <td class="n"><input type="number" step="0.01" placeholder="Toneladas" value="${l.ton??""}" onchange="setLin(${i},${j},'ton',this.value)"></td>
+          <td class="n">${fmt((+l.ton||0)*(+l.tarifa||0))}</td></tr>`;
+      });
+      html+=`<tr class="lin-add"><td></td><td></td><td colspan="5"><button class="btn sm g" onclick="addLin(${i})">+ Agregar cliente</button>${asig}</td></tr>`;
+      return;
+    }
     if(s.sel&&s.auto) s.cant=autoCant(s);
-    const sub=s.sel&&s.tarifa!=null?(+s.cant||0)*s.tarifa:0;
+    const sub=subSvc(s);
     const esp=esEsp(s);
     const tarCell=`<input class="tar ${esp?"esp":""}" type="number" step="0.01" placeholder="Por cotizar" value="${s.tarifa??""}" onchange="setTar(${i},this.value)">`
       +(esp?`<span class="pub">pública: ${s.tarifaPub==null?"por cotizar":fmt(s.tarifaPub)}</span>`:"");
@@ -626,8 +679,10 @@ function renderSvc(){
       <td class="n"><b>${s.sel?fmt(sub):""}</b></td></tr>`;
   });
   $("tSvc").innerHTML=html;
-  EDIT.total=EDIT.servicios.reduce((t,s)=>t+(s.sel&&s.tarifa!=null?(+s.cant||0)*s.tarifa:0),0);
+  EDIT.total=EDIT.servicios.reduce((t,s)=>t+subSvc(s),0);
   $("edTot").textContent="US$ "+fmt(EDIT.total);
+  const pc=porCliente(EDIT,$("nCliente").value.trim());
+  $("edPorCli").innerHTML=pc.length>1?"Por cliente: "+pc.map(([c,v])=>`<b>${esc(c)}</b> US$ ${fmt(v)}`).join(" · "):"";
   const dol=+$("nDolar").value||EDIT.dolar;
   $("edTotClp").textContent=dol?`$ ${fmt0(EDIT.total*dol)}  (US$ ${fmt(EDIT.total)} × $ ${fmt(dol)})`:"Falta dólar observado (ingrese fecha de desatraque)";
   renderEgr();
@@ -693,7 +748,7 @@ function renderEgr(){
 }
 function restablecerPub(){
   if(!confirm("¿Volver todas las tarifas de esta nave a la tarifa pública?")) return;
-  EDIT.servicios.forEach(s=>s.tarifa=s.tarifaPub); renderSvc();
+  EDIT.servicios.forEach(s=>{s.tarifa=s.tarifaPub;(s.lineas||[]).forEach(l=>l.tarifa=s.tarifaPub);}); renderSvc();
 }
 function descargarTarNave(){
   const rows=EDIT.servicios.map(s=>({"N°":s.n,"Sección":s.sec,"Ítem":s.desc,"Unidad":s.unidad,"Tarifa":s.tarifa,"Tarifa pública":s.tarifaPub}));
@@ -714,7 +769,38 @@ function cargarTarNave(f){
   });
   $("fTarNave").value="";
 }
-function togSvc(i,v){const s=EDIT.servicios[i];s.sel=v;if(v&&s.cant==null){s.auto=true;}renderSvc();}
+function togSvc(i,v){const s=EDIT.servicios[i];s.sel=v;if(v&&s.cant==null){s.auto=true;}if(!v&&MULTI(s))s.lineas=[];renderSvc();}
+function addLin(i){
+  const s=EDIT.servicios[i], tonNave=+$("nTon").value||0;
+  s.lineas.forEach(l=>l.auto=false);
+  const usadas=s.lineas.reduce((t,l)=>t+(+l.ton||0),0);
+  s.lineas.push({cliente:"",tarifa:s.tarifa??s.tarifaPub,ton:Math.max(+(tonNave-usadas).toFixed(2),0),auto:false});
+  renderSvc();
+  const ins=$("tSvc").querySelectorAll("tr.lin td.cl input");
+  const k=EDIT.servicios.slice(0,i+1).reduce((t,x)=>t+(x.sel&&tieneLin(x)?x.lineas.length:0),0)-1;
+  if(ins[k]) ins[k].focus();
+}
+function delLin(i,j){
+  const s=EDIT.servicios[i]; s.lineas.splice(j,1);
+  if(!s.lineas.length) s.sel=false;
+  renderSvc();
+}
+function setLin(i,j,k,v){
+  const l=EDIT.servicios[i].lineas[j];
+  if(k==="cliente") l.cliente=v.trim();
+  else { l[k]=v===""?null:+v; if(k==="ton") l.auto=false; }
+  renderSvc();
+}
+/* Ingresos de la nave repartidos por cliente: las líneas por cliente van a su cliente; el resto, al cliente de la nave */
+function porCliente(n,cliNave){
+  const m=new Map(), add=(c,v)=>{c=c||cliNave||"(sin cliente)";m.set(c,(m.get(c)||0)+v);};
+  (n.servicios||[]).forEach(s=>{
+    if(!s.sel) return;
+    if(tieneLin(s)) s.lineas.forEach(l=>add(l.cliente,(+l.ton||0)*(+l.tarifa||0)));
+    else add("",subSvc(s));
+  });
+  return [...m.entries()].filter(([,v])=>v);
+}
 function setCant(i,v){const s=EDIT.servicios[i];s.cant=+v;s.auto=false;renderSvc();}
 function resetCant(i){EDIT.servicios[i].auto=true;renderSvc();}
 function setTar(i,v){EDIT.servicios[i].tarifa=v===""?null:+v;renderSvc();}
@@ -747,10 +833,17 @@ function exportNaves(){
     Concepto:e.concepto,Proveedor:e.proveedor,Moneda:e.moneda==="USD"?"US$":"$",Modo:MODO_TXT[e.modo],Valor:e.valor,Cantidad:e.cant,
     Subtotal:+sub.toFixed(2),"Subtotal US$":e.moneda==="USD"?+sub.toFixed(2):(n.dolar?+(sub/n.dolar).toFixed(2):"")});}));
   const det=[];
-  NAVES.forEach(n=>n.servicios.filter(s=>s.sel).forEach(s=>det.push({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,"N°":s.n,Ítem:s.desc,Unidad:s.unidad,"Tarifa pública US$":s.tarifaPub??s.tarifa,"Tarifa aplicada US$":s.tarifa,"Especial":esEsp(s)?"Sí":"",Cantidad:s.cant,"Subtotal US$":+((+s.cant||0)*(s.tarifa||0)).toFixed(2)})));
+  NAVES.forEach(n=>n.servicios.filter(s=>s.sel).forEach(s=>{
+    const base={Nave:n.nombre,"Cliente nave":n.cliente||"",Viaje:n.viaje,"N°":s.n,Ítem:s.desc,Unidad:s.unidad,"Tarifa pública US$":s.tarifaPub??s.tarifa};
+    if(tieneLin(s)) s.lineas.forEach(l=>det.push({...base,"Cliente servicio":l.cliente||n.cliente||"","Tarifa aplicada US$":l.tarifa,"Especial":l.tarifa!==s.tarifaPub?"Sí":"",Cantidad:l.ton,"Subtotal US$":+((+l.ton||0)*(+l.tarifa||0)).toFixed(2)}));
+    else det.push({...base,"Cliente servicio":n.cliente||"","Tarifa aplicada US$":s.tarifa,"Especial":esEsp(s)?"Sí":"",Cantidad:s.cant,"Subtotal US$":+subSvc(s).toFixed(2)});
+  }));
+  const cliRows=[];
+  NAVES.forEach(n=>porCliente(n,n.cliente).forEach(([c,v])=>cliRows.push({Nave:n.nombre,Viaje:n.viaje,Cliente:c,"Ingreso US$":+v.toFixed(2),"Ingreso CLP":n.dolar?Math.round(v*n.dolar):""})));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),"Resumen naves");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(det),"Detalle servicios");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cliRows),"Ingresos por cliente");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(egrRows),"Egresos");
   XLSX.writeFile(wb,"Ingresos_Naves_HTP.xlsx");
 }

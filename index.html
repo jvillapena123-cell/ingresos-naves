@@ -116,6 +116,29 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
 .ops .val{font-size:20px;margin-top:3px}
 .ops .val .u{font-size:12px}
 @media (max-width:900px){.fin{grid-template-columns:1fr}.fin>div{border-right:0;border-bottom:1px solid var(--line)}.ops{grid-template-columns:1fr 1fr}.ops>div:nth-child(2){border-right:0}.ops>div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+/* Gráfico rentabilidad por MN */
+.rent .row{gap:10px}
+.rent-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.rent-top h2{margin:0 0 2px}
+.rent-ctl{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.rent-ctl .u{display:flex;flex-direction:column}
+.rent-ctl input{width:78px;text-align:right}
+.verd{display:flex;gap:14px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-left-width:5px;border-radius:10px;padding:12px 16px;margin:12px 0 4px;background:#fbfcfe}
+.verd .big{font-size:24px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+.verd .txt{font-size:13px;color:var(--txt);flex:1;min-width:220px}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;border-radius:99px;padding:3px 10px;white-space:nowrap}
+.st.v{background:#e6f4ec;color:#1f7a45}.st.a{background:#fff4dc;color:#8a5a00}.st.n{background:#fbe9e7;color:#b03a2e}
+.gleg{display:flex;gap:16px;font-size:12px;color:var(--mut);margin:14px 0 2px;flex-wrap:wrap}
+.gleg span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c);vertical-align:-1px}
+.gtit{font-size:12px;font-weight:700;color:var(--navy);letter-spacing:.04em;text-transform:uppercase;margin-top:16px}
+.gwrap{position:relative}
+.gwrap svg{display:block;width:100%;height:auto;overflow:visible;font-family:Montserrat,system-ui,sans-serif}
+.gtip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(22,43,82,.14);padding:9px 11px;font-size:12px;min-width:190px;z-index:4;display:none}
+.gtip b{color:var(--navy)}
+.gtip .r{display:flex;justify-content:space-between;gap:14px;font-variant-numeric:tabular-nums}
+.gtip .r i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.rent table td.n{font-variant-numeric:tabular-nums}
+.rent details{margin-top:12px}.rent summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--navy)}
 @media print{.exec{box-shadow:none;break-inside:avoid}}
 @media print{header,nav,.noprint,.banner{display:none!important}main{padding:0}.card{border:0}}
 </style>
@@ -153,6 +176,17 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
   <!-- ===== LISTA NAVES ===== -->
   <div id="v-naves">
     <section class="exec" id="kpis" aria-label="Resumen financiero"></section>
+    <section class="card rent" id="rent" aria-label="Rentabilidad por nave">
+      <div class="rent-top">
+        <div><h2>Ingresos vs egresos por MN</h2><div class="muted">Rentabilidad de cada nave y viabilidad del margen</div></div>
+        <div class="rent-ctl">
+          <div class="u"><label>Cliente</label><select id="gCli" style="width:200px" onchange="$('fCli').value=this.value;renderNaves()"></select></div>
+          <div class="u"><label>Viable desde (%)</label><input id="gMeta" type="number" step="1" onchange="setUmbral()"></div>
+          <div class="u"><label>Mínimo aceptable (%)</label><input id="gMin" type="number" step="1" onchange="setUmbral()"></div>
+        </div>
+      </div>
+      <div id="gBody"></div>
+    </section>
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:12px">
         <h2 style="margin:0">Naves registradas</h2>
@@ -523,7 +557,132 @@ function renderNaves(){
       <div><div class="lbl">Ingreso promedio por nave</div><div class="val">${U("US$")}${fmt(L.length?tot/L.length:0)}</div></div>
       <div><div class="lbl">Ingreso por tonelada</div><div class="val">${U("US$")}${ton?fmt(tot/ton):"—"}${ton?S("/t"):""}</div></div>
     </div>`;
+  $("gCli").innerHTML=fc.innerHTML; $("gCli").value=cli;
+  renderGrafico(L,cli);
 }
+
+/* ---------- Gráfico ingresos vs egresos y % de margen por MN ---------- */
+const C_ING="#2F5FA8", C_EGR="#D9722F";
+const ST={v:{t:"Viable",i:"✓",c:"#1f8a4c"},a:{t:"Ajustado",i:"!",c:"#c98a00"},n:{t:"No viable",i:"✕",c:"#c0392b"}};
+function umbral(){const u=LS.get("umbral")||{};return {meta:u.meta??30,min:u.min??15};}
+function setUmbral(){
+  let meta=+$("gMeta").value, min=+$("gMin").value;
+  if(isNaN(meta))meta=30; if(isNaN(min))min=15; if(min>meta)min=meta;
+  LS.set("umbral",{meta,min}); renderNaves();
+}
+const estadoMg=(p,u)=>p>=u.meta?"v":p>=u.min?"a":"n";
+const stHtml=k=>`<span class="st ${k}">${ST[k].i} ${ST[k].t}</span>`;
+const kUS=v=>{const a=Math.abs(v);return (v<0?"-":"")+(a>=1e6?fmt(a/1e6).replace(/,00$/,"")+" M":a>=1e3?Math.round(a/1e3)+"k":fmt0(a));};
+function niceMax(v){if(v<=0)return 1;const e=Math.pow(10,Math.floor(Math.log10(v))),f=v/e;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*e;}
+function barPath(x,y0,y1,w,r){ // barra con extremo redondeado (lejos de la base)
+  const up=y1<y0, h=Math.abs(y1-y0); r=Math.min(r,h,w/2);
+  if(h<0.5) return "";
+  return up?`M${x},${y0}V${y1+r}Q${x},${y1} ${x+r},${y1}H${x+w-r}Q${x+w},${y1} ${x+w},${y1+r}V${y0}Z`
+           :`M${x},${y0}V${y1-r}Q${x},${y1} ${x+r},${y1}H${x+w-r}Q${x+w},${y1} ${x+w},${y1-r}V${y0}Z`;
+}
+function renderGrafico(L,cli){
+  const u=umbral(); $("gMeta").value=u.meta; $("gMin").value=u.min;
+  const D=[...L].sort((a,b)=>(a.atraque||"").localeCompare(b.atraque||"")).map(n=>{
+    const ing=n.total||0, egr=n.totalEgresos||0, mg=ing-egr, p=ing?mg/ing*100:0;
+    const comp=cli&&n.cliente!==cli; // cliente participa en una nave compartida
+    const t=+n.toneladas||0;
+    return {n,ing,egr,mg,p,k:estadoMg(p,u),comp,t,it:t?ing/t:null,et:t?egr/t:null,mt:t?mg/t:null};
+  });
+  const body=$("gBody");
+  if(!D.length){body.innerHTML='<div class="muted" style="padding:20px;text-align:center">Sin naves para este filtro.</div>';return;}
+  const TI=D.reduce((s,d)=>s+d.ing,0), TE=D.reduce((s,d)=>s+d.egr,0), TP=TI?(TI-TE)/TI*100:0, TK=estadoMg(TP,u);
+  const cnt={v:0,a:0,n:0}; D.forEach(d=>cnt[d.k]++);
+  const peor=D.reduce((a,d)=>d.p<a.p?d:a,D[0]);
+  const quien=cli?esc(cli):"Todos los clientes";
+  const txt=TK==="v"?`El margen ponderado supera la meta de ${fmt0(u.meta)}%: ${cli?"la operación con "+quien:"la operación en conjunto"} es <b>viable</b>.`
+           :TK==="a"?`El margen ponderado está entre el mínimo (${fmt0(u.min)}%) y la meta (${fmt0(u.meta)}%): es <b>viable con poca holgura</b>; conviene revisar tarifa o costos.`
+           :`El margen ponderado está bajo el mínimo de ${fmt0(u.min)}%: con estas tarifas y costos la operación <b>no es viable</b>.`;
+  const W=Math.max(Math.floor(body.clientWidth||900),360), padL=62, padR=86, pw=W-padL-padR, n=D.length, gw=pw/n;
+  const rot=gw<92, nameMax=Math.max(6,Math.floor((rot?120:gw-10)/7.2));
+  const nm=s=>{s=s||"—";return s.length>nameMax?s.slice(0,nameMax-1)+"…":s;};
+  const xLbl=(i,y)=>{const cx=padL+gw*i+gw/2;return rot
+    ?`<text x="${cx}" y="${y}" transform="rotate(-35 ${cx} ${y})" text-anchor="end" font-size="11" fill="#1d2433" font-weight="600">${esc(nm(D[i].n.nombre))}</text>`
+    :`<text x="${cx}" y="${y}" text-anchor="middle" font-size="11" fill="#1d2433" font-weight="600">${esc(nm(D[i].n.nombre))}</text>`;};
+  const xH=rot?78:24;
+  // Gráfico 1: US$
+  const H1=230, top1=10, max1=niceMax(Math.max(...D.map(d=>Math.max(d.ing,d.egr)))), y1=v=>top1+H1-(v/max1)*H1;
+  let g1="";
+  for(let t=0;t<=5;t++){const v=max1*t/5,y=y1(v);g1+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${t?"#eef1f6":"#b9c2d0"}"/><text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#6b7486">${t?"US$ "+kUS(v):"0"}</text>`;}
+  const bw=Math.max(6,Math.min(30,gw*0.3));
+  D.forEach((d,i)=>{const cx=padL+gw*i+gw/2;
+    g1+=`<path d="${barPath(cx-bw-1,y1(0),y1(d.ing),bw,4)}" fill="${C_ING}"/><path d="${barPath(cx+1,y1(0),y1(d.egr),bw,4)}" fill="${C_EGR}"/>`;
+    g1+=`<rect class="hit" data-i="${i}" x="${padL+gw*i}" y="${top1}" width="${gw}" height="${H1}" fill="transparent"/>`;
+    g1+=xLbl(i,top1+H1+16);});
+  const svg1=`<svg viewBox="0 0 ${W} ${top1+H1+xH}" role="img" aria-label="Ingresos y egresos en US$ por nave">${g1}</svg>`;
+  // Gráfico 2: % margen con umbrales
+  const H2=190, top2=22, lo=Math.min(0,Math.floor(Math.min(...D.map(d=>d.p))/10)*10), hi=Math.max(u.meta+10,Math.ceil(Math.max(...D.map(d=>d.p))/10)*10,10);
+  const y2=v=>top2+H2-((v-lo)/(hi-lo))*H2;
+  let g2="";
+  const step=(hi-lo)>60?20:10;
+  for(let v=lo;v<=hi;v+=step){const y=y2(v);g2+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${v===0?"#b9c2d0":"#eef1f6"}"/><text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#6b7486">${v}%</text>`;}
+  [[u.meta,"Meta "+fmt0(u.meta)+"%",ST.v.c],[u.min,"Mínimo "+fmt0(u.min)+"%",ST.n.c]].forEach(([v,t,c])=>{const y=y2(v);
+    g2+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${c}" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-padR+6}" y="${y+4}" font-size="11" font-weight="700" fill="${c}">${t}</text>`;});
+  const bw2=Math.max(8,Math.min(44,gw*0.42)), lab=n<=14;
+  D.forEach((d,i)=>{const cx=padL+gw*i+gw/2;
+    g2+=`<path d="${barPath(cx-bw2/2,y2(0),y2(d.p),bw2,4)}" fill="${ST[d.k].c}"/>`;
+    if(lab){const y=d.p>=0?y2(d.p)-7:y2(d.p)+15;g2+=`<text x="${cx}" y="${y}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d2433">${ST[d.k].i} ${fmt(d.p).replace(/,(\d)0$/,",$1")}%</text>`;}
+    g2+=`<rect class="hit" data-i="${i}" x="${padL+gw*i}" y="${top2-16}" width="${gw}" height="${H2+16}" fill="transparent"/>`;
+    g2+=xLbl(i,top2+H2+16);});
+  // Gráfico 3: US$ por tonelada (ingreso y egreso)
+  const H3=190, top3=22, max3=niceMax(Math.max(1,...D.map(d=>Math.max(d.it||0,d.et||0)))), y3=v=>top3+H3-(v/max3)*H3;
+  let g3="";
+  for(let t=0;t<=5;t++){const v=max3*t/5,y=y3(v);g3+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${t?"#eef1f6":"#b9c2d0"}"/><text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#6b7486">${t?"US$ "+fmt(v).replace(/,00$/,""):"0"}</text>`;}
+  D.forEach((d,i)=>{const cx=padL+gw*i+gw/2;
+    if(d.t){g3+=`<path d="${barPath(cx-bw-1,y3(0),y3(d.it),bw,4)}" fill="${C_ING}"/><path d="${barPath(cx+1,y3(0),y3(d.et),bw,4)}" fill="${C_EGR}"/>`;
+      if(lab)g3+=`<text x="${cx-bw/2-1}" y="${y3(d.it)-6}" text-anchor="middle" font-size="11" font-weight="700" fill="#1d2433">${fmt(d.it)}</text>`;}
+    else g3+=`<text x="${cx}" y="${y3(0)-8}" text-anchor="middle" font-size="11" fill="#6b7486">sin toneladas</text>`;
+    g3+=`<rect class="hit" data-i="${i}" x="${padL+gw*i}" y="${top3-16}" width="${gw}" height="${H3+16}" fill="transparent"/>`;
+    g3+=xLbl(i,top3+H3+16);});
+  const TT=D.reduce((s,d)=>s+d.t,0), DT=D.filter(d=>d.t), TIt=DT.reduce((s,d)=>s+d.ing,0), TEt=DT.reduce((s,d)=>s+d.egr,0);
+  const svg3=`<svg viewBox="0 0 ${W} ${top3+H3+xH}" role="img" aria-label="Ingreso y egreso en US$ por tonelada por nave">${g3}</svg>`;
+  const svg2=`<svg viewBox="0 0 ${W} ${top2+H2+xH}" role="img" aria-label="Porcentaje de margen por nave con umbrales de viabilidad">${g2}</svg>`;
+  const filas=D.map(d=>`<tr><td><b>${esc(d.n.nombre)}</b>${d.comp?' <span class="pill p-op" title="'+esc(cli)+' participa en esta nave; los montos son de la nave completa">compartida</span>':""}</td><td class="fh">${fAtr(d.n.atraque)}</td><td>${esc(d.n.cliente)}</td>
+    <td class="n">${fmt(d.ing)}</td><td class="n">${fmt(d.egr)}</td><td class="n" style="color:${d.mg>=0?"var(--ok)":"var(--bad)"}"><b>${fmt(d.mg)}</b></td><td class="n"><b>${fmt(d.p)}%</b></td><td class="n">${fmt0(d.t)}</td><td class="n">${d.t?fmt(d.it):"—"}</td><td class="n">${d.t?fmt(d.et):"—"}</td><td class="n">${d.t?"<b>"+fmt(d.mt)+"</b>":"—"}</td><td>${stHtml(d.k)}</td></tr>`).join("");
+  body.innerHTML=`
+    <div class="verd" style="border-left-color:${ST[TK].c}">
+      <div><div class="lbl">Margen ponderado · ${quien}</div><div class="big">${fmt(TP)}%</div></div>
+      ${stHtml(TK)}
+      <div class="txt">${txt}<br><span class="muted">${n} MN · ${cnt.v} viable${cnt.v===1?"":"s"}, ${cnt.a} ajustada${cnt.a===1?"":"s"}, ${cnt.n} no viable${cnt.n===1?"":"s"} · menor margen: <b>${esc(peor.n.nombre)}</b> (${fmt(peor.p)}%)</span></div>
+    </div>
+    <div class="gtit">Ingresos vs egresos (US$)</div>
+    <div class="gleg"><span style="--c:${C_ING}">Ingresos</span><span style="--c:${C_EGR}">Egresos</span></div>
+    <div class="gwrap">${svg1}<div class="gtip"></div></div>
+    <div class="gtit">% de ganancia por MN (margen sobre ingresos)</div>
+    <div class="gleg"><span style="--c:${ST.v.c}">✓ Viable ≥ ${fmt0(u.meta)}%</span><span style="--c:${ST.a.c}">! Ajustado ${fmt0(u.min)}–${fmt0(u.meta)}%</span><span style="--c:${ST.n.c}">✕ No viable &lt; ${fmt0(u.min)}%</span></div>
+    <div class="gwrap">${svg2}<div class="gtip"></div></div>
+    <div class="gtit">US$ por tonelada por MN</div>
+    <div class="gleg"><span style="--c:${C_ING}">Ingreso US$/t</span><span style="--c:${C_EGR}">Egreso US$/t</span>${TT?`<span style="--c:transparent;margin-left:auto">Promedio ponderado: ingreso <b>US$ ${fmt(TIt/TT)}/t</b> · egreso <b>US$ ${fmt(TEt/TT)}/t</b> · margen <b>US$ ${fmt((TIt-TEt)/TT)}/t</b></span>`:""}</div>
+    <div class="gwrap">${svg3}<div class="gtip"></div></div>
+    <details><summary>Ver tabla de viabilidad por MN</summary><div class="tw" style="margin-top:8px"><table class="tn">
+      <thead><tr><th>Nave</th><th>Atraque</th><th>Cliente</th><th class="n">Ingresos US$</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th class="n">% ganancia</th><th class="n">Toneladas</th><th class="n">Ingreso US$/t</th><th class="n">Egreso US$/t</th><th class="n">Margen US$/t</th><th>Viabilidad</th></tr></thead>
+      <tbody>${filas}</tbody></table></div></details>`;
+  body.querySelectorAll(".gwrap").forEach(w=>{
+    const tip=w.querySelector(".gtip"), svg=w.querySelector("svg");
+    w.querySelectorAll(".hit").forEach(r=>{
+      r.addEventListener("mouseenter",()=>r.setAttribute("fill","rgba(31,58,110,.05)"));
+      r.addEventListener("mouseleave",()=>{r.setAttribute("fill","transparent");tip.style.display="none";});
+      r.addEventListener("mousemove",e=>{const d=D[+r.dataset.i];
+        tip.innerHTML=`<b>${esc(d.n.nombre)}</b> <span class="muted">${esc(d.n.cliente||"")}</span>
+          <div class="r"><span><i style="background:${C_ING}"></i>Ingresos</span><span>US$ ${fmt(d.ing)}</span></div>
+          <div class="r"><span><i style="background:${C_EGR}"></i>Egresos</span><span>US$ ${fmt(d.egr)}</span></div>
+          <div class="r"><span>Margen</span><b>US$ ${fmt(d.mg)}</b></div>
+          <div class="r"><span>% ganancia</span><b>${fmt(d.p)}%</b></div>
+          <div class="r" style="margin-top:5px;border-top:1px solid var(--line);padding-top:5px"><span>Toneladas</span><span>${fmt0(d.t)} t</span></div>
+          ${d.t?`<div class="r"><span><i style="background:${C_ING}"></i>Ingreso/t</span><span>US$ ${fmt(d.it)}</span></div><div class="r"><span><i style="background:${C_EGR}"></i>Egreso/t</span><span>US$ ${fmt(d.et)}</span></div><div class="r"><span>Margen/t</span><b>US$ ${fmt(d.mt)}</b></div>`:'<div class="muted">Sin toneladas registradas</div>'}<div style="margin-top:6px">${stHtml(d.k)}</div>`;
+        tip.style.display="block";
+        const b=w.getBoundingClientRect(); let x=e.clientX-b.left+14; if(x+tip.offsetWidth>b.width)x=e.clientX-b.left-tip.offsetWidth-14;
+        tip.style.left=x+"px"; tip.style.top=Math.max(0,e.clientY-b.top-tip.offsetHeight/2)+"px";});
+      r.addEventListener("click",()=>abrirNave(D[+r.dataset.i].n.id));
+      r.style.cursor="pointer";
+    });
+  });
+}
+let _rz; window.addEventListener("resize",()=>{clearTimeout(_rz);_rz=setTimeout(()=>{if(!$("v-naves").classList.contains("hidden")&&NAVES.length)renderNaves();},200);});
 
 /* ---------- Editor nave ---------- */
 const cliLineas=n=>(n.servicios||[]).flatMap(s=>s.sel&&Array.isArray(s.lineas)?s.lineas.map(l=>(l.cliente||"").trim()):[]);

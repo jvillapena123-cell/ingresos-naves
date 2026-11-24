@@ -199,7 +199,7 @@ tr.sec td{background:#f7f9fc;font-weight:700;color:var(--navy);font-size:12px}
         </div>
       </div>
       <div class="tw"><table class="tn">
-        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th class="n">Total CLP</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th></th></tr></thead>
+        <thead><tr><th>Nave</th><th>Cliente</th><th>Viaje</th><th>Carga</th><th>Atraque</th><th class="n">Eslora (m)</th><th class="n">Horas</th><th class="n">Toneladas</th><th>Estado</th><th class="n">Total US$</th><th class="n">Total CLP</th><th class="n">Egresos US$</th><th class="n">Costo US$/t</th><th class="n">Margen US$</th><th></th></tr></thead>
         <tbody id="tNaves"></tbody>
       </table></div>
     </div>
@@ -530,9 +530,10 @@ function renderNaves(){
     <td class="n"><b>${fmt(n.total)}</b></td>
     <td class="n">${n.dolar?`$ ${fmt0(n.total*n.dolar)}<small class="dol">dólar ${fmt(n.dolar)}</small>`:'<span class="muted">Sin dólar</span>'}</td>
     <td class="n">${fmt(n.totalEgresos||0)}</td>
+    <td class="n">${+n.toneladas?fmt((n.totalEgresos||0)/(+n.toneladas)):'<span class="muted">—</span>'}</td>
     <td class="n" style="color:${(n.total||0)-(n.totalEgresos||0)>=0?"var(--ok)":"var(--bad)"}"><b>${fmt((n.total||0)-(n.totalEgresos||0))}</b></td>
     <td><button class="btn sm g" onclick="abrirNave('${n.id}')">Abrir</button></td></tr>`).join("")
-    :`<tr><td colspan="14" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
+    :`<tr><td colspan="15" class="muted" style="text-align:center;padding:24px">Sin naves. Use “+ Nueva nave”.</td></tr>`;
   const tot=L.reduce((s,n)=>s+(n.total||0),0), ton=L.reduce((s,n)=>s+(+n.toneladas||0),0);
   const clp=L.reduce((s,n)=>s+(n.dolar?(n.total||0)*n.dolar:0),0), sinD=L.filter(n=>!n.dolar).length;
   const egr=L.reduce((s,n)=>s+(n.totalEgresos||0),0);
@@ -1024,7 +1025,7 @@ function exportNaves(){
     Atraque:fDate(n.atraque),Desatraque:fDate(n.desatraque),"Eslora (m)":n.eslora,Horas:n.horas,Toneladas:n.toneladas,Estado:n.estado,"Total US$":+(n.total||0).toFixed(2),
     "Dólar observado":n.dolar||"","Fecha dólar":n.dolarFecha?fDay(n.dolarFecha):"","Fuente dólar":n.dolarFuente||"",
     "Total CLP":n.dolar?Math.round((n.total||0)*n.dolar):"",
-    "Egresos US$":+(n.totalEgresos||0).toFixed(2),"Margen US$":+((n.total||0)-(n.totalEgresos||0)).toFixed(2),
+    "Egresos US$":+(n.totalEgresos||0).toFixed(2),"Costo US$/t":+n.toneladas?+((n.totalEgresos||0)/(+n.toneladas)).toFixed(2):"","Margen US$":+((n.total||0)-(n.totalEgresos||0)).toFixed(2),
     "Margen %":n.total?+(((n.total-(n.totalEgresos||0))/n.total)*100).toFixed(1):""}));
   const egrRows=[];
   NAVES.forEach(n=>(n.egresos||[]).forEach(e=>{const sub=(+e.valor||0)*(+e.cant||0);egrRows.push({Nave:n.nombre,Cliente:n.cliente||"",Viaje:n.viaje,

@@ -628,18 +628,19 @@ function renderGrafico(L,cli){
     if(lab){const y=d.p>=0?y2(d.p)-7:y2(d.p)+15;g2+=`<text x="${cx}" y="${y}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d2433">${ST[d.k].i} ${fmt(d.p).replace(/,(\d)0$/,",$1")}%</text>`;}
     g2+=`<rect class="hit" data-i="${i}" x="${padL+gw*i}" y="${top2-16}" width="${gw}" height="${H2+16}" fill="transparent"/>`;
     g2+=xLbl(i,top2+H2+16);});
-  // Gráfico 3: US$ por tonelada (ingreso y egreso)
-  const H3=190, top3=22, max3=niceMax(Math.max(1,...D.map(d=>Math.max(d.it||0,d.et||0)))), y3=v=>top3+H3-(v/max3)*H3;
+  // Gráfico 3: costo (egresos) US$ por tonelada
+  const TT=D.reduce((s,d)=>s+d.t,0), DT=D.filter(d=>d.t), TIt=DT.reduce((s,d)=>s+d.ing,0), TEt=DT.reduce((s,d)=>s+d.egr,0), PR=TT?TEt/TT:0;
+  const H3=190, top3=22, max3=niceMax(Math.max(1,PR,...D.map(d=>d.et||0))), y3=v=>top3+H3-(v/max3)*H3;
   let g3="";
   for(let t=0;t<=5;t++){const v=max3*t/5,y=y3(v);g3+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${t?"#eef1f6":"#b9c2d0"}"/><text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#6b7486">${t?"US$ "+fmt(v).replace(/,00$/,""):"0"}</text>`;}
+  if(TT){const y=y3(PR);g3+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="#1F3A6E" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-padR+6}" y="${y-2}" font-size="11" font-weight="700" fill="#1F3A6E">Promedio</text><text x="${W-padR+6}" y="${y+11}" font-size="11" font-weight="700" fill="#1F3A6E">US$ ${fmt(PR)}/t</text>`;}
   D.forEach((d,i)=>{const cx=padL+gw*i+gw/2;
-    if(d.t){g3+=`<path d="${barPath(cx-bw-1,y3(0),y3(d.it),bw,4)}" fill="${C_ING}"/><path d="${barPath(cx+1,y3(0),y3(d.et),bw,4)}" fill="${C_EGR}"/>`;
-      if(lab)g3+=`<text x="${cx-bw/2-1}" y="${y3(d.it)-6}" text-anchor="middle" font-size="11" font-weight="700" fill="#1d2433">${fmt(d.it)}</text>`;}
+    if(d.t){g3+=`<path d="${barPath(cx-bw2/2,y3(0),y3(d.et),bw2,4)}" fill="${C_EGR}"/>`;
+      if(lab)g3+=`<text x="${cx}" y="${y3(d.et)-7}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d2433" stroke="#fff" stroke-width="3" paint-order="stroke">${fmt(d.et)}</text>`;}
     else g3+=`<text x="${cx}" y="${y3(0)-8}" text-anchor="middle" font-size="11" fill="#6b7486">sin toneladas</text>`;
     g3+=`<rect class="hit" data-i="${i}" x="${padL+gw*i}" y="${top3-16}" width="${gw}" height="${H3+16}" fill="transparent"/>`;
     g3+=xLbl(i,top3+H3+16);});
-  const TT=D.reduce((s,d)=>s+d.t,0), DT=D.filter(d=>d.t), TIt=DT.reduce((s,d)=>s+d.ing,0), TEt=DT.reduce((s,d)=>s+d.egr,0);
-  const svg3=`<svg viewBox="0 0 ${W} ${top3+H3+xH}" role="img" aria-label="Ingreso y egreso en US$ por tonelada por nave">${g3}</svg>`;
+  const svg3=`<svg viewBox="0 0 ${W} ${top3+H3+xH}" role="img" aria-label="Costo en US$ por tonelada por nave">${g3}</svg>`;
   const svg2=`<svg viewBox="0 0 ${W} ${top2+H2+xH}" role="img" aria-label="Porcentaje de margen por nave con umbrales de viabilidad">${g2}</svg>`;
   const filas=D.map(d=>`<tr><td><b>${esc(d.n.nombre)}</b>${d.comp?' <span class="pill p-op" title="'+esc(cli)+' participa en esta nave; los montos son de la nave completa">compartida</span>':""}</td><td class="fh">${fAtr(d.n.atraque)}</td><td>${esc(d.n.cliente)}</td>
     <td class="n">${fmt(d.ing)}</td><td class="n">${fmt(d.egr)}</td><td class="n" style="color:${d.mg>=0?"var(--ok)":"var(--bad)"}"><b>${fmt(d.mg)}</b></td><td class="n"><b>${fmt(d.p)}%</b></td><td class="n">${fmt0(d.t)}</td><td class="n">${d.t?fmt(d.it):"—"}</td><td class="n">${d.t?fmt(d.et):"—"}</td><td class="n">${d.t?"<b>"+fmt(d.mt)+"</b>":"—"}</td><td>${stHtml(d.k)}</td></tr>`).join("");
@@ -655,11 +656,11 @@ function renderGrafico(L,cli){
     <div class="gtit">% de ganancia por MN (margen sobre ingresos)</div>
     <div class="gleg"><span style="--c:${ST.v.c}">✓ Viable ≥ ${fmt0(u.meta)}%</span><span style="--c:${ST.a.c}">! Ajustado ${fmt0(u.min)}–${fmt0(u.meta)}%</span><span style="--c:${ST.n.c}">✕ No viable &lt; ${fmt0(u.min)}%</span></div>
     <div class="gwrap">${svg2}<div class="gtip"></div></div>
-    <div class="gtit">US$ por tonelada por MN</div>
-    <div class="gleg"><span style="--c:${C_ING}">Ingreso US$/t</span><span style="--c:${C_EGR}">Egreso US$/t</span>${TT?`<span style="--c:transparent;margin-left:auto">Promedio ponderado: ingreso <b>US$ ${fmt(TIt/TT)}/t</b> · egreso <b>US$ ${fmt(TEt/TT)}/t</b> · margen <b>US$ ${fmt((TIt-TEt)/TT)}/t</b></span>`:""}</div>
+    <div class="gtit">Costo US$/t por MN (egresos ÷ toneladas)</div>
+    <div class="gleg">${TT?`<span style="--c:transparent;padding-left:0">Costo promedio ponderado <b>US$ ${fmt(PR)}/t</b> · ingreso <b>US$ ${fmt(TIt/TT)}/t</b> · margen <b>US$ ${fmt((TIt-TEt)/TT)}/t</b></span>`:""}</div>
     <div class="gwrap">${svg3}<div class="gtip"></div></div>
     <details><summary>Ver tabla de viabilidad por MN</summary><div class="tw" style="margin-top:8px"><table class="tn">
-      <thead><tr><th>Nave</th><th>Atraque</th><th>Cliente</th><th class="n">Ingresos US$</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th class="n">% ganancia</th><th class="n">Toneladas</th><th class="n">Ingreso US$/t</th><th class="n">Egreso US$/t</th><th class="n">Margen US$/t</th><th>Viabilidad</th></tr></thead>
+      <thead><tr><th>Nave</th><th>Atraque</th><th>Cliente</th><th class="n">Ingresos US$</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th class="n">% ganancia</th><th class="n">Toneladas</th><th class="n">Ingreso US$/t</th><th class="n">Costo US$/t</th><th class="n">Margen US$/t</th><th>Viabilidad</th></tr></thead>
       <tbody>${filas}</tbody></table></div></details>`;
   body.querySelectorAll(".gwrap").forEach(w=>{
     const tip=w.querySelector(".gtip"), svg=w.querySelector("svg");
@@ -673,7 +674,7 @@ function renderGrafico(L,cli){
           <div class="r"><span>Margen</span><b>US$ ${fmt(d.mg)}</b></div>
           <div class="r"><span>% ganancia</span><b>${fmt(d.p)}%</b></div>
           <div class="r" style="margin-top:5px;border-top:1px solid var(--line);padding-top:5px"><span>Toneladas</span><span>${fmt0(d.t)} t</span></div>
-          ${d.t?`<div class="r"><span><i style="background:${C_ING}"></i>Ingreso/t</span><span>US$ ${fmt(d.it)}</span></div><div class="r"><span><i style="background:${C_EGR}"></i>Egreso/t</span><span>US$ ${fmt(d.et)}</span></div><div class="r"><span>Margen/t</span><b>US$ ${fmt(d.mt)}</b></div>`:'<div class="muted">Sin toneladas registradas</div>'}<div style="margin-top:6px">${stHtml(d.k)}</div>`;
+          ${d.t?`<div class="r"><span><i style="background:${C_ING}"></i>Ingreso/t</span><span>US$ ${fmt(d.it)}</span></div><div class="r"><span><i style="background:${C_EGR}"></i>Costo/t</span><span>US$ ${fmt(d.et)}</span></div><div class="r"><span>Margen/t</span><b>US$ ${fmt(d.mt)}</b></div>`:'<div class="muted">Sin toneladas registradas</div>'}<div style="margin-top:6px">${stHtml(d.k)}</div>`;
         tip.style.display="block";
         const b=w.getBoundingClientRect(); let x=e.clientX-b.left+14; if(x+tip.offsetWidth>b.width)x=e.clientX-b.left-tip.offsetWidth-14;
         tip.style.left=x+"px"; tip.style.top=Math.max(0,e.clientY-b.top-tip.offsetHeight/2)+"px";});

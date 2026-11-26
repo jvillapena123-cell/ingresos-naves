@@ -587,7 +587,8 @@ function renderGrafico(L,cli){
     const ing=n.total||0, egr=n.totalEgresos||0, mg=ing-egr, p=ing?mg/ing*100:0;
     const comp=cli&&n.cliente!==cli; // cliente participa en una nave compartida
     const t=+n.toneladas||0;
-    return {n,ing,egr,mg,p,k:estadoMg(p,u),comp,t,it:t?ing/t:null,et:t?egr/t:null,mt:t?mg/t:null};
+    const por=(n.egresos||[]).filter(e=>/porteo/i.test(e.concepto||"")).reduce((s,e)=>s+(egrUSD(e,+n.dolar||0)||0),0), esp=egr-por;
+    return {n,ing,egr,mg,p,k:estadoMg(p,u),comp,t,it:t?ing/t:null,et:t?egr/t:null,mt:t?mg/t:null,por,esp,st:t?esp/t:null,pt:t?por/t:null};
   });
   const body=$("gBody");
   if(!D.length){body.innerHTML='<div class="muted" style="padding:20px;text-align:center">Sin naves para este filtro.</div>';return;}
@@ -642,9 +643,22 @@ function renderGrafico(L,cli){
     g3+=`<rect class="hit" data-i="${i}" x="${padL+gw*i}" y="${top3-16}" width="${gw}" height="${H3+16}" fill="transparent"/>`;
     g3+=xLbl(i,top3+H3+16);});
   const svg3=`<svg viewBox="0 0 ${W} ${top3+H3+xH}" role="img" aria-label="Costo en US$ por tonelada por nave">${g3}</svg>`;
+  // Gráfico 4: costo US$/t sin porteo
+  const C_SP="#8A5A2B", TSP=DT.reduce((s,d)=>s+d.esp,0), TPO=DT.reduce((s,d)=>s+d.por,0), PR4=TT?TSP/TT:0;
+  const max4=niceMax(Math.max(1,PR4,...D.map(d=>d.st||0))), y4=v=>top3+H3-(v/max4)*H3;
+  let g4="";
+  for(let t=0;t<=5;t++){const v=max4*t/5,y=y4(v);g4+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="${t?"#eef1f6":"#b9c2d0"}"/><text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#6b7486">${t?"US$ "+fmt(v).replace(/,00$/,""):"0"}</text>`;}
+  if(TT){const y=y4(PR4);g4+=`<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="#1F3A6E" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-padR+6}" y="${y-2}" font-size="11" font-weight="700" fill="#1F3A6E">Promedio</text><text x="${W-padR+6}" y="${y+11}" font-size="11" font-weight="700" fill="#1F3A6E">US$ ${fmt(PR4)}/t</text>`;}
+  D.forEach((d,i)=>{const cx=padL+gw*i+gw/2;
+    if(d.t){g4+=`<path d="${barPath(cx-bw2/2,y4(0),y4(d.st),bw2,4)}" fill="${C_SP}"/>`;
+      if(lab)g4+=`<text x="${cx}" y="${y4(d.st)-7}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d2433" stroke="#fff" stroke-width="3" paint-order="stroke">${fmt(d.st)}</text>`;}
+    else g4+=`<text x="${cx}" y="${y4(0)-8}" text-anchor="middle" font-size="11" fill="#6b7486">sin toneladas</text>`;
+    g4+=`<rect class="hit" data-i="${i}" x="${padL+gw*i}" y="${top3-16}" width="${gw}" height="${H3+16}" fill="transparent"/>`;
+    g4+=xLbl(i,top3+H3+16);});
+  const svg4=`<svg viewBox="0 0 ${W} ${top3+H3+xH}" role="img" aria-label="Costo en US$ por tonelada sin porteo por nave">${g4}</svg>`;
   const svg2=`<svg viewBox="0 0 ${W} ${top2+H2+xH}" role="img" aria-label="Porcentaje de margen por nave con umbrales de viabilidad">${g2}</svg>`;
   const filas=D.map(d=>`<tr><td><b>${esc(d.n.nombre)}</b>${d.comp?' <span class="pill p-op" title="'+esc(cli)+' participa en esta nave; los montos son de la nave completa">compartida</span>':""}</td><td class="fh">${fAtr(d.n.atraque)}</td><td>${esc(d.n.cliente)}</td>
-    <td class="n">${fmt(d.ing)}</td><td class="n">${fmt(d.egr)}</td><td class="n" style="color:${d.mg>=0?"var(--ok)":"var(--bad)"}"><b>${fmt(d.mg)}</b></td><td class="n"><b>${fmt(d.p)}%</b></td><td class="n">${fmt0(d.t)}</td><td class="n">${d.t?fmt(d.it):"—"}</td><td class="n">${d.t?fmt(d.et):"—"}</td><td class="n">${d.t?"<b>"+fmt(d.mt)+"</b>":"—"}</td><td>${stHtml(d.k)}</td></tr>`).join("");
+    <td class="n">${fmt(d.ing)}</td><td class="n">${fmt(d.egr)}</td><td class="n" style="color:${d.mg>=0?"var(--ok)":"var(--bad)"}"><b>${fmt(d.mg)}</b></td><td class="n"><b>${fmt(d.p)}%</b></td><td class="n">${fmt0(d.t)}</td><td class="n">${d.t?fmt(d.it):"—"}</td><td class="n">${d.t?fmt(d.et):"—"}</td><td class="n">${d.t?fmt(d.pt):"—"}</td><td class="n">${d.t?fmt(d.st):"—"}</td><td class="n">${d.t?"<b>"+fmt(d.mt)+"</b>":"—"}</td><td>${stHtml(d.k)}</td></tr>`).join("");
   body.innerHTML=`
     <div class="verd" style="border-left-color:${ST[TK].c}">
       <div><div class="lbl">Margen ponderado · ${quien}</div><div class="big">${fmt(TP)}%</div></div>
@@ -660,8 +674,11 @@ function renderGrafico(L,cli){
     <div class="gtit">Costo US$/t por MN (egresos ÷ toneladas)</div>
     <div class="gleg">${TT?`<span style="--c:transparent;padding-left:0">Costo promedio ponderado <b>US$ ${fmt(PR)}/t</b> · ingreso <b>US$ ${fmt(TIt/TT)}/t</b> · margen <b>US$ ${fmt((TIt-TEt)/TT)}/t</b></span>`:""}</div>
     <div class="gwrap">${svg3}<div class="gtip"></div></div>
+    <div class="gtit">Costo US$/t por MN sin porteo ((egresos − porteo) ÷ toneladas)</div>
+    <div class="gleg">${TT?`<span style="--c:transparent;padding-left:0">Costo promedio ponderado sin porteo <b>US$ ${fmt(PR4)}/t</b> · porteo <b>US$ ${fmt(TPO/TT)}/t</b> · margen sin porteo <b>US$ ${fmt((TIt-TSP)/TT)}/t</b></span>`:""}</div>
+    <div class="gwrap">${svg4}<div class="gtip"></div></div>
     <details><summary>Ver tabla de viabilidad por MN</summary><div class="tw" style="margin-top:8px"><table class="tn">
-      <thead><tr><th>Nave</th><th>Atraque</th><th>Cliente</th><th class="n">Ingresos US$</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th class="n">% ganancia</th><th class="n">Toneladas</th><th class="n">Ingreso US$/t</th><th class="n">Costo US$/t</th><th class="n">Margen US$/t</th><th>Viabilidad</th></tr></thead>
+      <thead><tr><th>Nave</th><th>Atraque</th><th>Cliente</th><th class="n">Ingresos US$</th><th class="n">Egresos US$</th><th class="n">Margen US$</th><th class="n">% ganancia</th><th class="n">Toneladas</th><th class="n">Ingreso US$/t</th><th class="n">Costo US$/t</th><th class="n">Porteo US$/t</th><th class="n">Costo s/porteo US$/t</th><th class="n">Margen US$/t</th><th>Viabilidad</th></tr></thead>
       <tbody>${filas}</tbody></table></div></details>`;
   body.querySelectorAll(".gwrap").forEach(w=>{
     const tip=w.querySelector(".gtip"), svg=w.querySelector("svg");
@@ -675,7 +692,7 @@ function renderGrafico(L,cli){
           <div class="r"><span>Margen</span><b>US$ ${fmt(d.mg)}</b></div>
           <div class="r"><span>% ganancia</span><b>${fmt(d.p)}%</b></div>
           <div class="r" style="margin-top:5px;border-top:1px solid var(--line);padding-top:5px"><span>Toneladas</span><span>${fmt0(d.t)} t</span></div>
-          ${d.t?`<div class="r"><span><i style="background:${C_ING}"></i>Ingreso/t</span><span>US$ ${fmt(d.it)}</span></div><div class="r"><span><i style="background:${C_EGR}"></i>Costo/t</span><span>US$ ${fmt(d.et)}</span></div><div class="r"><span>Margen/t</span><b>US$ ${fmt(d.mt)}</b></div>`:'<div class="muted">Sin toneladas registradas</div>'}<div style="margin-top:6px">${stHtml(d.k)}</div>`;
+          ${d.t?`<div class="r"><span><i style="background:${C_ING}"></i>Ingreso/t</span><span>US$ ${fmt(d.it)}</span></div><div class="r"><span><i style="background:${C_EGR}"></i>Costo/t</span><span>US$ ${fmt(d.et)}</span></div><div class="r"><span>Porteo/t</span><span>US$ ${fmt(d.pt)}</span></div><div class="r"><span><i style="background:#8A5A2B"></i>Costo/t sin porteo</span><span>US$ ${fmt(d.st)}</span></div><div class="r"><span>Margen/t</span><b>US$ ${fmt(d.mt)}</b></div>`:'<div class="muted">Sin toneladas registradas</div>'}<div style="margin-top:6px">${stHtml(d.k)}</div>`;
         tip.style.display="block";
         const b=w.getBoundingClientRect(); let x=e.clientX-b.left+14; if(x+tip.offsetWidth>b.width)x=e.clientX-b.left-tip.offsetWidth-14;
         tip.style.left=x+"px"; tip.style.top=Math.max(0,e.clientY-b.top-tip.offsetHeight/2)+"px";});
